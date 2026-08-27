@@ -77,9 +77,12 @@ export function CheckoutFlow() {
 
   const deliveryBy = Date.now() + 5 * 86_400_000;
 
-  const complete = (paymentId?: string) => {
+  const complete = async (receipt?: RazorpayResponse, serverId?: string) => {
+    const paymentId = receipt?.razorpay_payment_id;
     const order: Order = {
-      id: newOrderId(),
+      // The server mints the id when it creates the pending row, so the copy
+      // the shopper sees has to reuse it or their order page points at nothing.
+      id: serverId ?? newOrderId(),
       lines,
       address,
       payment,
@@ -89,7 +92,30 @@ export function CheckoutFlow() {
       deliveryBy,
       totals,
     };
+    // Local copy drives the shopper's own order pages.
     saveOrder(order);
+
+    /**
+     * Server copy is what the admin revenue page reads. A failure here must not
+     * strand someone who has already paid, so it only logs.
+     */
+    try {
+      await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: order.id,
+          lines,
+          payment,
+          paymentId,
+          razorpayOrderId: receipt?.razorpay_order_id,
+          razorpaySignature: receipt?.razorpay_signature,
+        }),
+      });
+    } catch (caught) {
+      console.error("Could not record the order server-side", caught);
+    }
+
     cart?.clear();
     router.push(`/dashboard/orders/${order.id}`);
   };
@@ -104,7 +130,8 @@ export function CheckoutFlow() {
     if (pending || rows.length === 0) return;
 
     if (payment === "Cash on Delivery") {
-      complete();
+      setPending(true);
+      await complete();
       return;
     }
 
@@ -135,7 +162,7 @@ export function CheckoutFlow() {
             body: JSON.stringify(result),
           });
           if (verify.ok) {
-            complete(result.razorpay_payment_id);
+            await complete(result, order.receiptId);
           } else {
             toast.error("Payment could not be verified.");
             setPending(false);
