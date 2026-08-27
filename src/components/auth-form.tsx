@@ -43,6 +43,20 @@ function isTakenIdentifier(error: ClerkError) {
   return text.includes("taken") || text.includes("already exists");
 }
 
+/**
+ * Sign in blocked because the account has no password — it was created through
+ * a social provider. Clerk phrases this as a "verification strategy" problem,
+ * which tells the person nothing about what to do next.
+ */
+function isPasswordNotSet(error: ClerkError) {
+  const text =
+    `${error?.message ?? ""} ${error?.longMessage ?? ""}`.toLowerCase();
+  return (
+    text.includes("verification strategy is not valid") ||
+    text.includes("strategy_for_user_invalid")
+  );
+}
+
 /** Sign in blocked because no user matches the identifier. */
 function isUnknownAccount(error: ClerkError) {
   const text =
@@ -183,6 +197,38 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     }
   }, []);
 
+  /**
+   * A password alone does not always finish a sign-in. Clerk asks for an email
+   * code in two distinct cases, and the flow stalls if either is missed:
+   *   needs_second_factor — the account has MFA enrolled;
+   *   needs_client_trust  — no MFA, but this browser has not been seen before.
+   */
+  const needsEmailCode = (status: string | null) =>
+    status === "needs_second_factor" || status === "needs_client_trust";
+
+  /**
+   * `finalize()` is what converts a completed sign-in into the active session.
+   * Its `navigate` callback has to route through `decorateUrl`, which is what
+   * carries the session across Safari's tracking prevention.
+   */
+  const completeSignIn = React.useCallback(async () => {
+    const done = await signIn!.finalize({
+      navigate: ({ session, decorateUrl }) => {
+        const target = session?.currentTask
+          ? `/sign-in/tasks/${session.currentTask.key}`
+          : "/dashboard";
+        const url = decorateUrl(target);
+        // decorateUrl can hand back an absolute URL, which router.push rejects.
+        if (url.startsWith("http")) {
+          window.location.href = url;
+        } else {
+          router.push(url);
+        }
+      },
+    });
+    if (done.error) throw new Error(readError(done.error));
+  }, [router, signIn]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!ready || pending) return;
@@ -226,9 +272,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           );
         }
 
-        await completeSignIn();
         clearAutoResetGuard();
-        router.push("/dashboard");
+        await completeSignIn();
         return;
       } else {
         let attempt = await signIn!.password({ identifier: email, password });
@@ -241,11 +286,16 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             setMissingAccount(true);
             throw new Error("No account found with that email.");
           }
+          if (isPasswordNotSet(attempt.error)) {
+            throw new Error(
+              "This account doesn’t use a password — sign in with Google below.",
+            );
+          }
           throw new Error(readError(attempt.error, "Wrong email or password."));
         }
-        // Password alone leaves the sign-in at `needs_second_factor` on this
-        // instance, so send the email code and collect it before finalising.
-        if (signIn!.status === "needs_second_factor") {
+        // Password alone leaves the sign-in needing an email code on this
+        // instance, so send it and collect the code before finalising.
+        if (needsEmailCode(signIn!.status)) {
           const sent = await signIn!.mfa.sendEmailCode();
           if (sent.error) throw new Error(readError(sent.error));
           clearAutoResetGuard();
@@ -253,9 +303,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           return;
         }
 
-        await completeSignIn();
         clearAutoResetGuard();
-        router.push("/dashboard");
+        await completeSignIn();
       }
     } catch (caught) {
       const message =
@@ -284,21 +333,6 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     }
   };
 
-  /**
-   * Ticket and MFA flows both create the session on the sign-in resource;
-   * `finalize()` fails outright when it cannot find one, so prefer activating
-   * the session we were handed and only fall back to finalize.
-   */
-  const completeSignIn = React.useCallback(async () => {
-    const sessionId = signIn?.createdSessionId;
-    if (sessionId) {
-      await clerk.setActive({ session: sessionId });
-      return;
-    }
-    const done = await signIn!.finalize();
-    if (done.error) throw new Error(readError(done.error));
-  }, [clerk, signIn]);
-
   const verifyCode = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!ready || pending) return;
@@ -310,8 +344,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       if (verified.error) {
         throw new Error(readError(verified.error, "That code did not work."));
       }
+      if (needsEmailCode(signIn!.status)) {
+        const sent = await signIn!.mfa.sendEmailCode();
+        if (sent.error) throw new Error(readError(sent.error));
+        setCode("");
+        throw new Error("One more code — we sent a fresh one to your inbox.");
+      }
       await completeSignIn();
-      router.push("/dashboard");
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Something went wrong.",

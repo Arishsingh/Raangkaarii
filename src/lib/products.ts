@@ -11,7 +11,11 @@ export type Product = {
   occasion: string;
   sizes: string[];
   inStock: boolean;
+  /** Headings this piece is listed under; drives the "Collection" filter. */
+  collections?: string[];
   image: string;
+  /** Optional clip, shown above the stills on the product page. */
+  video?: string;
   alt: string;
 };
 
@@ -39,10 +43,11 @@ export const filterFields = {
 } as const;
 
 /** Counts come from the catalogue so they can never drift out of sync. */
-function countBy(field: keyof Product) {
+function countBy(list: Product[], field: keyof Product) {
   const tally = new Map<string, number>();
-  for (const product of products) {
+  for (const product of list) {
     const value = String(product[field]);
+    if (!value) continue;
     tally.set(value, (tally.get(value) ?? 0) + 1);
   }
   return [...tally.entries()]
@@ -50,33 +55,75 @@ function countBy(field: keyof Product) {
     .map(([label, count]) => ({ label, count }));
 }
 
-export const sizeOptions = (() => {
-  const order = ["XS", "S", "M", "L", "XL", "XXL", "One Size"];
+const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "One Size"];
+
+/** Every admin-added piece carries this, so new stock is one click away. */
+export const JUST_ADDED = "Just added";
+
+function countCollections(list: Product[]) {
   const tally = new Map<string, number>();
-  for (const product of products) {
+  for (const product of list) {
+    for (const entry of product.collections ?? []) {
+      tally.set(entry, (tally.get(entry) ?? 0) + 1);
+    }
+  }
+  // "Just added" leads; the admin's own headings follow alphabetically.
+  return [...tally.entries()]
+    .sort((a, b) => {
+      if (a[0] === JUST_ADDED) return -1;
+      if (b[0] === JUST_ADDED) return 1;
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([label, count]) => ({ label, count }));
+}
+
+function countSizes(list: Product[]) {
+  const tally = new Map<string, number>();
+  for (const product of list) {
     for (const size of product.sizes) {
       tally.set(size, (tally.get(size) ?? 0) + 1);
     }
   }
-  return order
-    .filter((size) => tally.has(size))
-    .map((label) => ({ label, count: tally.get(label)! }));
-})();
+  return SIZE_ORDER.filter((size) => tally.has(size)).map((label) => ({
+    label,
+    count: tally.get(label)!,
+  }));
+}
 
-export const filterGroups: FilterGroup[] = [
-  { heading: "Category", options: countBy("category") },
-  { heading: "Fabric", options: countBy("fabric") },
-  { heading: "Colour", options: countBy("colour") },
-  { heading: "Occasion", options: countBy("occasion") },
-  { heading: "Size", options: sizeOptions },
-  {
-    heading: "Availability",
-    options: [
-      { label: "In stock", count: products.filter((p) => p.inStock).length },
-      { label: "Made to order", count: products.filter((p) => !p.inStock).length },
-    ],
-  },
-];
+/** Built from whichever catalogue is on screen, so admin products are counted. */
+export function buildFilterGroups(list: Product[]): FilterGroup[] {
+  const collections = countCollections(list);
+
+  return [
+    // Only shown once something has been added through the admin panel.
+    ...(collections.length > 0
+      ? [{ heading: "Collection", options: collections }]
+      : []),
+    { heading: "Category", options: countBy(list, "category") },
+    { heading: "Fabric", options: countBy(list, "fabric") },
+    { heading: "Colour", options: countBy(list, "colour") },
+    { heading: "Occasion", options: countBy(list, "occasion") },
+    { heading: "Size", options: countSizes(list) },
+    {
+      heading: "Availability",
+      options: [
+        { label: "In stock", count: list.filter((p) => p.inStock).length },
+        { label: "Made to order", count: list.filter((p) => !p.inStock).length },
+      ],
+    },
+  ];
+}
+
+export const sizeOptions = countSizes(products);
+
+export const filterGroups: FilterGroup[] = buildFilterGroups(products);
+
+/** Distinct headings the shop board groups by, for the admin panel's picker. */
+export const categories = [...new Set(products.map((p) => p.category))].sort();
+
+export const fabrics = [...new Set(products.map((p) => p.fabric))].sort();
+export const colours = [...new Set(products.map((p) => p.colour))].sort();
+export const occasions = [...new Set(products.map((p) => p.occasion))].sort();
 
 export const MAX_PRICE = 8000;
 

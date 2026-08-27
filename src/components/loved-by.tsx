@@ -121,7 +121,7 @@ export function LovedBy() {
             onClick={() => scrollByCard(-1)}
             disabled={atStart}
             aria-label="Previous clips"
-            className="p-1 transition-opacity hover:opacity-60 disabled:pointer-events-none disabled:opacity-25"
+            className="p-1 transition-opacity hover:opacity-60 disabled:pointer-events-none disabled:opacity-25 pointer-coarse:p-2.5"
           >
             <ArrowLeft className="size-5" strokeWidth={1.5} />
           </button>

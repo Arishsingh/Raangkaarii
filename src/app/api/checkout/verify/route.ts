@@ -1,12 +1,14 @@
-import crypto from "node:crypto";
+import { signatureValid } from "@/lib/razorpay";
 
 /**
  * Confirms the payment really came from Razorpay by recomputing the HMAC
  * signature with the secret key. Anything else is treated as unpaid.
+ *
+ * This only reports on the signature — /api/orders is what records the result,
+ * and it re-verifies rather than trusting a prior call to this route.
  */
 export async function POST(request: Request) {
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keySecret) {
+  if (!process.env.RAZORPAY_KEY_SECRET) {
     return Response.json({ error: "Payments are not configured." }, { status: 503 });
   }
 
@@ -26,24 +28,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing payment details." }, { status: 400 });
   }
 
-  const expected = crypto
-    .createHmac("sha256", keySecret)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-    .digest("hex");
-
-  // Constant-time compare so the signature cannot be guessed byte by byte.
-  const valid =
-    expected.length === razorpay_signature.length &&
-    crypto.timingSafeEqual(
-      Buffer.from(expected),
-      Buffer.from(razorpay_signature),
-    );
-
-  if (!valid) {
+  if (!signatureValid(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
     console.error("Razorpay signature mismatch", { razorpay_order_id });
     return Response.json({ error: "Payment could not be verified." }, { status: 400 });
   }
 
-  // A real store would record the order here before confirming to the customer.
   return Response.json({ ok: true, paymentId: razorpay_payment_id });
 }

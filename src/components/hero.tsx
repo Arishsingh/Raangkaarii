@@ -152,11 +152,11 @@ export function Hero() {
           type="button"
           aria-label="Previous slide"
           onClick={() => paginate(-1)}
-          className="p-1 opacity-80 transition-opacity hover:opacity-100"
+          className="p-1 opacity-80 pointer-coarse:p-2.5 transition-opacity hover:opacity-100"
         >
           <ChevronLeft className="size-5" />
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pointer-coarse:gap-5">
           {slides.map((s, i) => (
             <button
               key={s.image}
@@ -165,7 +165,10 @@ export function Hero() {
               aria-current={i === index}
               onClick={() => goTo(i)}
               className={cn(
-                "size-2 rounded-full bg-white transition-all duration-300",
+                "relative size-2 rounded-full bg-white transition-all duration-300",
+                // The dot itself must stay 8px, so the tap area is a
+                // transparent pseudo-element around it rather than padding.
+                "pointer-coarse:before:absolute pointer-coarse:before:-inset-2.5 pointer-coarse:before:content-['']",
                 i === index
                   ? "scale-150 ring-1 ring-white/70 ring-offset-4 ring-offset-transparent"
                   : "opacity-55 hover:opacity-90",
@@ -177,7 +180,7 @@ export function Hero() {
           type="button"
           aria-label="Next slide"
           onClick={() => paginate(1)}
-          className="p-1 opacity-80 transition-opacity hover:opacity-100"
+          className="p-1 opacity-80 pointer-coarse:p-2.5 transition-opacity hover:opacity-100"
         >
           <ChevronRight className="size-5" />
         </button>

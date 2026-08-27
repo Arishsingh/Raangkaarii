@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 
-import { BannerVideo } from "@/components/banner-video";
+import { ProductMedia } from "@/components/product-media";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,11 +105,12 @@ export function ProductDetail({ product }: { product: Product }) {
       </div>
 
       <div className="mt-6 grid items-start gap-10 lg:grid-cols-2">
-        <div className="aspect-[4/5] max-h-[560px] w-full overflow-hidden rounded-2xl border bg-muted">
-          <BannerVideo
-            src="/videos/banner.mp4"
-            poster={product.image}
-            label={product.alt}
+        <div className="relative aspect-[4/5] max-h-[560px] w-full overflow-hidden rounded-2xl border bg-muted">
+          <ProductMedia
+            image={product.image}
+            video={product.video}
+            alt={product.alt}
+            sizes="(min-width: 1024px) 560px, 90vw"
           />
         </div>
 

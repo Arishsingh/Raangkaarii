@@ -161,7 +161,7 @@ export function SiteFooter({ locked = false }: { locked?: boolean }) {
                   <Link
                     key={link.label}
                     href={link.href}
-                    className="text-sm font-light text-white/80 transition-colors hover:text-white"
+                    className="text-sm font-light text-white/80 transition-colors hover:text-white pointer-coarse:py-1.5"
                   >
                     {link.label}
                   </Link>
@@ -175,7 +175,7 @@ export function SiteFooter({ locked = false }: { locked?: boolean }) {
                   <Link
                     key={link.label}
                     href={link.href}
-                    className="text-sm font-light text-white/80 transition-colors hover:text-white"
+                    className="text-sm font-light text-white/80 transition-colors hover:text-white pointer-coarse:py-1.5"
                   >
                     {link.label}
                   </Link>
@@ -194,7 +194,7 @@ export function SiteFooter({ locked = false }: { locked?: boolean }) {
                     key={social.label}
                     href="#"
                     aria-label={social.label}
-                    className="flex size-9 items-center justify-center rounded-full bg-blush text-blush-foreground transition-opacity hover:opacity-80"
+                    className="flex size-9 items-center justify-center rounded-full bg-blush text-blush-foreground transition-opacity hover:opacity-80 pointer-coarse:size-11"
                   >
                     <svg viewBox="0 0 24 24" fill="currentColor" className="size-4">
                       <path d={social.path} />

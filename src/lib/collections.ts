@@ -5,6 +5,7 @@ export type Product = {
   compareAt?: number;
   rating: number;
   image: string;
+  video?: string;
   alt: string;
   badges: string[];
   style: string;
@@ -17,7 +18,7 @@ export type Product = {
 
 export const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
 
-const STYLES = [
+export const STYLES = [
   "Traditional Long Pyjamas",
   "Short Pyjamas",
   "Oversized Pyjamas",
@@ -26,9 +27,9 @@ const STYLES = [
   "Nightdresses & Shirts",
   "Separates",
 ];
-const FABRICS = ["Cotton", "Cotton Voile", "Cotton Gauze", "Satin", "Linen Blend"];
-const COLOURS = ["Cream", "Green", "Rosewater", "Pale Blue", "Navy", "Crimson"];
-const PRINTS = ["Floral", "Gingham", "Striped", "Animal", "Plain"];
+export const FABRICS = ["Cotton", "Cotton Voile", "Cotton Gauze", "Satin", "Linen Blend"];
+export const COLOURS = ["Cream", "Green", "Rosewater", "Pale Blue", "Navy", "Crimson"];
+export const PRINTS = ["Floral", "Gingham", "Striped", "Animal", "Plain"];
 const IMAGES = [
   { src: "/hero.png", alt: "Model in printed cotton pyjamas" },
   { src: "/hero-3.png", alt: "Model in a printed cotton nightdress" },
@@ -136,14 +137,23 @@ export function collectionSlugs() {
   return definitions.map((definition) => definition.slug);
 }
 
-export function getCollection(slug: string): Collection | null {
+export function getCollection(slug: string, extra: Product[] = []): Collection | null {
   const definition = definitions.find((entry) => entry.slug === slug);
   if (!definition) return null;
   return {
     slug: definition.slug,
     title: definition.title,
-    products: buildProducts(definition.slug, definition.count, definition.sale ?? false),
+    // Admin-added pieces lead the grid so new stock is seen first.
+    products: [
+      ...extra,
+      ...buildProducts(definition.slug, definition.count, definition.sale ?? false),
+    ],
   };
+}
+
+/** Every heading a product can be filed under, for the admin panel's picker. */
+export function collectionHeadings() {
+  return definitions.map(({ slug, title }) => ({ slug, title }));
 }
 
 export const filterGroups = [

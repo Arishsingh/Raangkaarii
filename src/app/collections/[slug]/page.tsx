@@ -6,6 +6,7 @@ import { FloatingActions } from "@/components/floating-actions";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { collectionSlugs, getCollection } from "@/lib/collections";
+import { getCollectionExtras } from "@/lib/catalog";
 
 export function generateStaticParams() {
   return collectionSlugs().map((slug) => ({ slug }));
@@ -22,7 +23,7 @@ export default async function CollectionPage({ params }: PageProps<"/collections
   if (userId) redirect("/dashboard");
 
   const { slug } = await params;
-  const collection = getCollection(slug);
+  const collection = getCollection(slug, await getCollectionExtras(slug));
   if (!collection) notFound();
 
   return (
