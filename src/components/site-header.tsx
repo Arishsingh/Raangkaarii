@@ -231,7 +231,7 @@ export function SiteHeader({
 
         <div
           className={cn(
-            "ml-auto flex flex-1 items-center gap-0.5",
+            "ml-auto flex flex-1 items-center justify-end gap-0.5",
             locked ? "ml-auto" : "lg:ml-0 lg:flex-none",
           )}
         >
