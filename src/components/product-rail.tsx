@@ -171,7 +171,7 @@ export function ProductRail() {
                   railRef.current?.scrollTo({ left: 0 });
                 }}
                 className={cn(
-                  "border-b pb-1 text-[15px] font-light tracking-wide transition-colors",
+                  "border-b pb-1 text-[15px] font-light tracking-wide transition-colors pointer-coarse:pb-2.5 pointer-coarse:pt-2",
                   index === active
                     ? "border-foreground text-foreground"
                     : "border-transparent text-foreground/55 hover:text-foreground",
@@ -254,7 +254,7 @@ function ProductCard({ product, href }: { product: Product; href: string }) {
             <span
               role="button"
               aria-label="Add to wishlist"
-              className="pointer-events-auto shrink-0 p-1 text-foreground/70 transition-colors hover:text-foreground"
+              className="pointer-events-auto shrink-0 p-1 text-foreground/70 transition-colors hover:text-foreground pointer-coarse:p-2.5"
             >
               <Heart className="size-4" strokeWidth={1.5} />
             </span>
