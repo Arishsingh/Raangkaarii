@@ -6,26 +6,39 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-import { BannerVideo } from "@/components/banner-video";
+import { ProductMedia } from "@/components/product-media";
 import { ShopFilters } from "@/components/shop-filters";
 import { useCart } from "@/components/cart-provider";
 import { useWishlist } from "@/components/wishlist-provider";
 import {
   MAX_PRICE,
   filterFields,
-  filterGroups,
-  products,
+  filterGroups as builtInFilterGroups,
+  products as builtInProducts,
+  type Product,
 } from "@/lib/products";
+import type { FilterGroup } from "@/components/shop-filters";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const tabs = ["All", "New Arrivals", "Sale"];
 
-export function ShopBoard({ name }: { name: string }) {
+export function ShopBoard({
+  name,
+  products = builtInProducts,
+  filterGroups = builtInFilterGroups,
+  maxPrice = MAX_PRICE,
+}: {
+  name: string;
+  products?: Product[];
+  filterGroups?: FilterGroup[];
+  /** Ceiling of the price slider; derived from the catalogue, never fixed. */
+  maxPrice?: number;
+}) {
   const searchParams = useSearchParams();
   const lovedView = searchParams.get("view") === "loved";
   const [selected, setSelected] = React.useState<Record<string, string[]>>({});
-  const [price, setPrice] = React.useState(MAX_PRICE);
+  const [price, setPrice] = React.useState(maxPrice);
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState("All");
   const wishlist = useWishlist();
@@ -52,6 +65,15 @@ export function ShopBoard({ name }: { name: string }) {
         if (chosen.length && !chosen.includes(String(product[field]))) return false;
       }
 
+      // Multi-value, so a match on any one heading is enough.
+      const collections = selected.Collection ?? [];
+      if (
+        collections.length &&
+        !collections.some((entry) => (product.collections ?? []).includes(entry))
+      ) {
+        return false;
+      }
+
       const sizes = selected.Size ?? [];
       if (sizes.length && !sizes.some((size) => product.sizes.includes(size))) {
         return false;
@@ -76,7 +98,7 @@ export function ShopBoard({ name }: { name: string }) {
       if (tab === "New Arrivals" && product.price < 3000) return false;
       return true;
     });
-  }, [loved, lovedView, price, query, selected, tab]);
+  }, [loved, lovedView, price, products, query, selected, tab]);
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-5 py-8 sm:px-8">
@@ -158,7 +180,7 @@ export function ShopBoard({ name }: { name: string }) {
           }
           price={price}
           onPriceChange={setPrice}
-          maxPrice={MAX_PRICE}
+          maxPrice={maxPrice}
         />
         )}
 
@@ -181,10 +203,11 @@ export function ShopBoard({ name }: { name: string }) {
                     href={`/dashboard/product/${product.id}`}
                     className="relative block aspect-[4/5] shrink-0 bg-muted"
                   >
-                    <BannerVideo
-                      src="/videos/banner.mp4"
-                      poster={product.image}
-                      label={product.alt}
+                    <ProductMedia
+                      image={product.image}
+                      video={product.video}
+                      alt={product.alt}
+                      sizes="(min-width: 1280px) 380px, (min-width: 640px) 45vw, 90vw"
                       compact
                     />
                   </Link>

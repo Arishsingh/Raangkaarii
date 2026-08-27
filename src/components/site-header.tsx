@@ -82,10 +82,13 @@ const womensMega: { heading: string; links: string[] }[][] = [
 export function SiteHeader({
   solid = false,
   locked = false,
+  admin = false,
 }: {
   solid?: boolean;
   /** Dashboard shell: hides every route back into the storefront. */
   locked?: boolean;
+  /** Set by pages that have already checked the signed-in user server-side. */
+  admin?: boolean;
 }) {
   const { isSignedIn, user } = useUser();
   const { signOut } = useClerk();
@@ -158,13 +161,13 @@ export function SiteHeader({
         )}
 
         {locked ? (
-          <span className="font-script text-3xl leading-none tracking-wide drop-shadow-sm sm:text-4xl lg:mr-4">
+          <span className="inline-flex items-center font-script text-3xl leading-none tracking-wide drop-shadow-sm pointer-coarse:py-1.5 sm:text-4xl lg:mr-4">
             Rangkaarii
           </span>
         ) : (
           <Link
             href="/"
-            className="font-script text-3xl leading-none tracking-wide drop-shadow-sm sm:text-4xl lg:mr-4"
+            className="inline-flex items-center font-script text-3xl leading-none tracking-wide drop-shadow-sm pointer-coarse:py-1.5 sm:text-4xl lg:mr-4"
           >
             Rangkaarii
           </Link>
@@ -324,6 +327,11 @@ export function SiteHeader({
                     <Link href="/dashboard">Your account</Link>
                   </DropdownMenuItem>
                 )}
+                {admin ? (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">Store control</Link>
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem onSelect={() => signOut({ redirectUrl: "/" })}>
                   Sign out
                 </DropdownMenuItem>

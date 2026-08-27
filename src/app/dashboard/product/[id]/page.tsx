@@ -6,7 +6,8 @@ import { CartProvider } from "@/components/cart-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { WishlistProvider } from "@/components/wishlist-provider";
-import { getProduct, products } from "@/lib/products";
+import { getShopProduct } from "@/lib/catalog";
+import { products } from "@/lib/products";
 
 export function generateStaticParams() {
   return products.map((product) => ({ id: product.id }));
@@ -16,7 +17,7 @@ export async function generateMetadata({
   params,
 }: PageProps<"/dashboard/product/[id]">) {
   const { id } = await params;
-  const product = getProduct(id);
+  const product = await getShopProduct(id);
   return { title: product ? `${product.name} — Rangkaarii` : "Rangkaarii" };
 }
 
@@ -27,7 +28,7 @@ export default async function ProductPage({
   if (!user) redirect("/sign-in");
 
   const { id } = await params;
-  const product = getProduct(id);
+  const product = await getShopProduct(id);
   if (!product) notFound();
 
   return (

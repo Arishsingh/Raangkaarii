@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import { ProductMedia } from "@/components/product-media";
 import Link from "next/link";
 import { ChevronDown, Heart, ShoppingBag, SlidersHorizontal, Star } from "lucide-react";
 
@@ -188,12 +188,13 @@ function ProductCard({ product }: { product: Product }) {
     <article>
       <Link href="#" className="group block">
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-          <Image
-            src={product.image}
+          <ProductMedia
+            image={product.image}
+            video={product.video}
             alt={product.alt}
-            fill
             sizes="(max-width: 1024px) 50vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            compact
           />
 
           <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
@@ -220,7 +221,7 @@ function ProductCard({ product }: { product: Product }) {
           <span
             role="button"
             aria-label="Add to wishlist"
-            className="absolute bottom-3 right-3 p-1 text-foreground/70 transition-colors hover:text-foreground"
+            className="absolute bottom-3 right-3 p-1 text-foreground/70 transition-colors hover:text-foreground pointer-coarse:bottom-2 pointer-coarse:right-2 pointer-coarse:p-2.5"
           >
             <Heart className="size-4" strokeWidth={1.5} />
           </span>
