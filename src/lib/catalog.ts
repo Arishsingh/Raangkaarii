@@ -1,6 +1,10 @@
 import "server-only";
 
-import { listAdminProducts, type AdminProduct } from "@/lib/catalog-store";
+import {
+  listAdminProducts,
+  listHiddenBuiltIns,
+  type AdminProduct,
+} from "@/lib/catalog-store";
 import {
   collectionHeadings,
   type Product as CollectionProduct,
@@ -92,8 +96,11 @@ function toCollectionProduct(entry: AdminProduct): CollectionProduct {
  * the built-in catalogue.
  */
 export async function getShopCatalog() {
-  const added = await listAdminProducts();
-  const products = [...added.map(toShopProduct), ...builtInProducts];
+  const [added, visibleBuiltIns] = await Promise.all([
+    listAdminProducts(),
+    listVisibleBuiltIns(),
+  ]);
+  const products = [...added.map(toShopProduct), ...visibleBuiltIns];
   return {
     products,
     filterGroups: buildFilterGroups(products),
@@ -111,9 +118,18 @@ function ceilingFor(products: ShopProduct[]) {
   return Math.ceil(dearest / 1000) * 1000;
 }
 
+/** The built-in range minus anything removed through the admin panel. */
+export async function listVisibleBuiltIns(): Promise<ShopProduct[]> {
+  const hidden = new Set(await listHiddenBuiltIns());
+  return builtInProducts.filter((product) => !hidden.has(product.id));
+}
+
 export async function getShopProduct(id: string): Promise<ShopProduct | null> {
   const builtIn = getBuiltInProduct(id);
-  if (builtIn) return builtIn;
+  if (builtIn) {
+    const hidden = await listHiddenBuiltIns();
+    return hidden.includes(id) ? null : builtIn;
+  }
 
   const added = await listAdminProducts();
   const match = added.find((entry) => entry.id === id);
@@ -141,8 +157,11 @@ export type CatalogCounts = {
 
 /** Powers the admin panel's "Products on site" overview. */
 export async function getCatalogCounts(): Promise<CatalogCounts> {
-  const added = await listAdminProducts();
-  const shop = [...added.map(toShopProduct), ...builtInProducts];
+  const [added, visibleBuiltIns] = await Promise.all([
+    listAdminProducts(),
+    listVisibleBuiltIns(),
+  ]);
+  const shop = [...added.map(toShopProduct), ...visibleBuiltIns];
 
   const tally = (values: string[]) => {
     const counts = new Map<string, number>();
@@ -158,7 +177,7 @@ export async function getCatalogCounts(): Promise<CatalogCounts> {
   return {
     total: shop.length,
     added: added.length,
-    builtIn: builtInProducts.length,
+    builtIn: visibleBuiltIns.length,
     withVideo: added.filter((entry) => entry.video).length,
     outOfStock: shop.filter((product) => !product.inStock).length,
     byCategory: tally(shop.map((product) => product.category)),

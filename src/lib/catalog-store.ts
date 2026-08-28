@@ -65,6 +65,13 @@ export function ensureSchema() {
         alter table admin_products
         add column if not exists video text not null default ''
       `;
+      // Built-in pieces live in the code, so "removing" one is recorded here.
+      await sql`
+        create table if not exists hidden_builtins (
+          id        text primary key,
+          hidden_at timestamptz not null default now()
+        )
+      `;
     })().catch((error) => {
       // Let the next call retry rather than caching a failed migration.
       schemaReady = null;
@@ -209,4 +216,31 @@ export async function adminProductIdExists(id: string) {
     select 1 from admin_products where id = ${id} limit 1
   `) as unknown[];
   return rows.length > 0;
+}
+
+/**
+ * Ids from the built-in range that the admin has removed. Like the other reads
+ * this never throws: without a database nothing is hidden, which keeps the
+ * whole built-in catalogue on the site rather than emptying it.
+ */
+export async function listHiddenBuiltIns(): Promise<string[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    await ensureSchema();
+    const sql = getSql();
+    const rows = (await sql`select id from hidden_builtins`) as { id: string }[];
+    return rows.map((row) => row.id);
+  } catch (error) {
+    console.error("Could not load hidden built-ins", error);
+    return [];
+  }
+}
+
+export async function hideBuiltIn(id: string) {
+  await ensureSchema();
+  const sql = getSql();
+  await sql`
+    insert into hidden_builtins (id) values (${id})
+    on conflict (id) do nothing
+  `;
 }

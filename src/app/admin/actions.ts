@@ -7,10 +7,12 @@ import {
   adminProductIdExists,
   deleteAdminProduct,
   getAdminProduct,
+  hideBuiltIn,
   upsertAdminProduct,
   type ProductInput,
 } from "@/lib/catalog-store";
 import { slugify } from "@/lib/collections";
+import { getProduct as getBuiltInProduct } from "@/lib/products";
 
 export type ActionState = { ok: boolean; message: string };
 
@@ -161,6 +163,37 @@ export async function removeProduct(
     return { ok: true, message: `Removed “${existing?.name ?? id}”.` };
   } catch (caught) {
     console.error("Could not delete product", caught);
+    return { ok: false, message: "Could not remove the product." };
+  }
+}
+
+/**
+ * Built-in pieces are defined in code, so there is no row to delete. Removing
+ * one records the id instead and the catalogue filters it out; past orders are
+ * untouched because they resolve names through the built-in list directly.
+ */
+export async function removeBuiltInProduct(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await assertAdmin();
+  } catch {
+    return { ok: false, message: "Not authorised." };
+  }
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { ok: false, message: "Missing product id." };
+
+  const product = getBuiltInProduct(id);
+  if (!product) return { ok: false, message: "No such built-in product." };
+
+  try {
+    await hideBuiltIn(id);
+    revalidateStorefront([]);
+    return { ok: true, message: `Removed \u201C${product.name}\u201D from the site.` };
+  } catch (caught) {
+    console.error("Could not hide built-in product", caught);
     return { ok: false, message: "Could not remove the product." };
   }
 }

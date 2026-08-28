@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Boxes, PackageX, Sparkles, Video } from "lucide-react";
 
+import { BuiltInList } from "@/components/admin/built-in-list";
 import { ProductList } from "@/components/admin/product-list";
 import { StatCard } from "@/components/admin/stat-card";
 import { getCatalogCounts } from "@/lib/catalog";
-import { listAdminProducts } from "@/lib/catalog-store";
+import { listAdminProducts, listHiddenBuiltIns } from "@/lib/catalog-store";
 import { collectionHeadings } from "@/lib/collections";
+import { products as builtInProducts } from "@/lib/products";
 
 export const metadata = { title: "Products on site — Admin" };
 
@@ -53,10 +55,15 @@ function Breakdown({
 }
 
 export default async function AdminProductsOverviewPage() {
-  const [counts, added] = await Promise.all([
+  const [counts, added, hiddenBuiltIns] = await Promise.all([
     getCatalogCounts(),
     listAdminProducts(),
+    listHiddenBuiltIns(),
   ]);
+
+  // A removed piece is gone for good, so it never reappears in this list.
+  const removedIds = new Set(hiddenBuiltIns);
+  const liveBuiltIns = builtInProducts.filter((p) => !removedIds.has(p.id));
 
   return (
     <div className="space-y-8">
@@ -114,7 +121,7 @@ export default async function AdminProductsOverviewPage() {
           <div>
             <h3 className="font-heading text-lg font-light">Your products</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Posted through this panel. The built-in range is not listed here.
+              Posted through this panel — the only ones you can edit or remove.
             </p>
           </div>
           <Link href="/admin" className="shrink-0 text-sm underline underline-offset-4">
@@ -122,6 +129,17 @@ export default async function AdminProductsOverviewPage() {
           </Link>
         </div>
         <ProductList products={added} headings={collectionHeadings()} />
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <h3 className="font-heading text-lg font-light">Built-in range</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {liveBuiltIns.length} of the {builtInProducts.length} pieces the store
+            ships with are on the site. Removing one takes it off for good.
+          </p>
+        </div>
+        <BuiltInList products={liveBuiltIns} />
       </section>
     </div>
   );
