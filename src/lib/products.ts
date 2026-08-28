@@ -91,6 +91,42 @@ function countSizes(list: Product[]) {
 }
 
 /** Built from whichever catalogue is on screen, so admin products are counted. */
+/**
+ * The shop's headings. A fixed list rather than one derived from the range, so
+ * a heading can be offered before any product sits in it — and so retiring a
+ * product cannot quietly remove a heading from the picker.
+ */
+export const categories = [
+  "Farshi Salwar Sets",
+  "Pakistani Party Wear",
+  "Pakistani Casual",
+  "Office Wear",
+  "Cord Sets",
+  "Party Wear Cord Sets",
+];
+
+/**
+ * Every shop heading, whether or not anything is filed under it, followed by
+ * any other category the catalogue happens to use. Derived counts alone would
+ * make a heading vanish the moment its last piece sold out or was removed.
+ */
+function categoryOptions(list: Product[]) {
+  const counted = new Map(
+    countBy(list, "category").map((entry) => [entry.label, entry.count]),
+  );
+
+  const fixed = categories.map((label) => ({
+    label,
+    count: counted.get(label) ?? 0,
+  }));
+
+  const extras = [...counted.entries()]
+    .filter(([label]) => !categories.includes(label))
+    .map(([label, count]) => ({ label, count }));
+
+  return [...fixed, ...extras];
+}
+
 export function buildFilterGroups(list: Product[]): FilterGroup[] {
   const collections = countCollections(list);
 
@@ -99,7 +135,7 @@ export function buildFilterGroups(list: Product[]): FilterGroup[] {
     ...(collections.length > 0
       ? [{ heading: "Collection", options: collections }]
       : []),
-    { heading: "Category", options: countBy(list, "category") },
+    { heading: "Category", options: categoryOptions(list) },
     { heading: "Fabric", options: countBy(list, "fabric") },
     { heading: "Colour", options: countBy(list, "colour") },
     { heading: "Occasion", options: countBy(list, "occasion") },
@@ -118,19 +154,7 @@ export const sizeOptions = countSizes(products);
 
 export const filterGroups: FilterGroup[] = buildFilterGroups(products);
 
-/**
- * The shop's headings. A fixed list rather than one derived from the range, so
- * a heading can be offered before any product sits in it — and so retiring a
- * product cannot quietly remove a heading from the picker.
- */
-export const categories = [
-  "Farshi Salwar Sets",
-  "Pakistani Party Wear",
-  "Pakistani Casual",
-  "Office Wear",
-  "Cord Sets",
-  "Party Wear Cord Sets",
-];
+
 
 export const fabrics = [...new Set(products.map((p) => p.fabric))].sort();
 export const colours = [...new Set(products.map((p) => p.colour))].sort();
