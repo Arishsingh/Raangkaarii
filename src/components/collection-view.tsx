@@ -231,11 +231,11 @@ function ProductCard({ product }: { product: Product }) {
           <div>
             <h3 className="font-serif text-base leading-snug">{product.name}</h3>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-sm font-light">
-              <span>£{product.price.toFixed(2)}</span>
+              <span>₹{product.price.toLocaleString("en-IN")}</span>
               {product.compareAt ? (
                 <>
                   <span className="text-foreground/45 line-through">
-                    £{product.compareAt.toFixed(2)}
+                    ₹{product.compareAt.toLocaleString("en-IN")}
                   </span>
                   <span className="bg-destructive px-1.5 py-0.5 text-[11px] text-white">
                     {discount}% off
