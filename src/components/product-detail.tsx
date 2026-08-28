@@ -111,6 +111,7 @@ export function ProductDetail({ product }: { product: Product }) {
             video={product.video}
             alt={product.alt}
             sizes="(min-width: 1024px) 560px, 90vw"
+            hoverToPlay={false}
           />
         </div>
 

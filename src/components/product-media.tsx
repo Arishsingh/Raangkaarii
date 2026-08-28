@@ -16,6 +16,7 @@ export function ProductMedia({
   sizes,
   compact = false,
   className,
+  hoverToPlay = true,
 }: {
   image?: string;
   video?: string;
@@ -24,9 +25,19 @@ export function ProductMedia({
   sizes: string;
   compact?: boolean;
   className?: string;
+  /** Cards hold on the photograph until hovered; pass false to autoplay. */
+  hoverToPlay?: boolean;
 }) {
   if (video) {
-    return <BannerVideo src={video} poster={image} label={alt} compact={compact} />;
+    return (
+      <BannerVideo
+        src={video}
+        poster={image}
+        label={alt}
+        compact={compact}
+        hoverToPlay={hoverToPlay}
+      />
+    );
   }
 
   if (image) {

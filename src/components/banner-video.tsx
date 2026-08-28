@@ -16,6 +16,7 @@ export function BannerVideo({
   poster,
   label,
   compact = false,
+  hoverToPlay = false,
 }: {
   src: string;
   poster?: string;
@@ -23,6 +24,12 @@ export function BannerVideo({
   label?: string;
   /** Smaller control, for use inside product cards. */
   compact?: boolean;
+  /**
+   * Hold on the poster until the pointer arrives, then loop the preview. A grid
+   * of cards all playing at once is noisy, and every clip costs bandwidth the
+   * shopper may never have asked for.
+   */
+  hoverToPlay?: boolean;
 }) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [full, setFull] = React.useState(false);
@@ -49,6 +56,23 @@ export function BannerVideo({
     }
   };
 
+  // Hover only drives the ambient preview; a clip playing in full is left alone.
+  const startPreview = () => {
+    const video = videoRef.current;
+    if (!video || full) return;
+    video.currentTime = 0;
+    void video.play().catch(() => {
+      // Autoplay policies can refuse a muted play; the poster simply stays.
+    });
+  };
+
+  const stopPreview = () => {
+    const video = videoRef.current;
+    if (!video || full) return;
+    video.pause();
+    video.currentTime = 0;
+  };
+
   const backToPreview = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -61,12 +85,16 @@ export function BannerVideo({
   };
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-muted">
+    <div
+      className="relative h-full w-full overflow-hidden bg-muted"
+      onMouseEnter={hoverToPlay ? startPreview : undefined}
+      onMouseLeave={hoverToPlay ? stopPreview : undefined}
+    >
       <video
         ref={videoRef}
         className="h-full w-full object-cover"
         poster={poster}
-        autoPlay
+        autoPlay={!hoverToPlay}
         muted
         loop
         playsInline
