@@ -1,12 +1,16 @@
 "use client";
 
 import * as React from "react";
+
+import { useNearViewport } from "@/components/use-near-viewport";
 import { Maximize2 } from "lucide-react";
 
 const pills = ["Hand Embroidery", "Natural Dyes"];
 
 export function CraftStory() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  // The clip sits well down the page; hold it until the reader gets there.
+  const [frameRef, near] = useNearViewport<HTMLDivElement>();
 
   const expand = () => {
     const video = videoRef.current;
@@ -57,7 +61,7 @@ export function CraftStory() {
           </div>
         </div>
 
-        <div className="relative mt-10 aspect-video overflow-hidden rounded-2xl bg-muted">
+        <div ref={frameRef} className="relative mt-10 aspect-video overflow-hidden rounded-2xl bg-muted">
           <video
             ref={videoRef}
             className="size-full object-cover"
@@ -66,10 +70,10 @@ export function CraftStory() {
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="none"
             aria-label="Artisans finishing embroidery in the Rangkaarii atelier"
           >
-            <source src="/videos/atelier.mp4" type="video/mp4" />
+            {near ? <source src="/videos/atelier.mp4" type="video/mp4" /> : null}
           </video>
 
           <button

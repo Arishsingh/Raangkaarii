@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ImageOff, Pause, Play, Volume2, VolumeX } from "lucide-react";
 
+import { useNearViewport } from "@/components/use-near-viewport";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_SECONDS = 2;
@@ -33,6 +34,12 @@ export function BannerVideo({
   hoverToPlay?: boolean;
 }) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  /**
+   * The source is withheld until the card approaches the screen. `preload`
+   * already stops a poster-backed clip fetching itself, but an autoplaying one
+   * ignores that — and a grid renders far more cards than are ever looked at.
+   */
+  const [frameRef, near] = useNearViewport<HTMLDivElement>();
   const [full, setFull] = React.useState(false);
   /**
    * Sound is React state bound straight to the element rather than assigned to
@@ -133,6 +140,7 @@ export function BannerVideo({
 
   return (
     <div
+      ref={frameRef}
       className="relative h-full w-full overflow-hidden bg-muted"
       onMouseEnter={hoverToPlay ? startPreview : undefined}
       onMouseLeave={hoverToPlay ? stopPreview : undefined}
@@ -169,7 +177,7 @@ export function BannerVideo({
          * format and MIME type found". Left to itself it trusts the
          * Content-Type the blob is served with.
          */
-        src={src}
+        src={near ? src : undefined}
       />
 
       <div

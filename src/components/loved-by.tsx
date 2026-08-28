@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+
+import { LazyVideo } from "@/components/lazy-video";
 import { ArrowLeft, ArrowRight, Star } from "lucide-react";
 
 /** Clips live in /public/videos; the poster stands in until one is added. */
@@ -98,18 +100,7 @@ export function LovedBy() {
               </p>
 
               <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-muted">
-                <video
-                  className="size-full object-cover"
-                  poster={reel.poster}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                  aria-hidden
-                >
-                  <source src={reel.video} type="video/mp4" />
-                </video>
+                <LazyVideo src={reel.video} poster={reel.poster} />
               </div>
             </article>
           ))}

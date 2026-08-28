@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+
+import { LazyVideo } from "@/components/lazy-video";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -57,18 +59,7 @@ export function SiteFooter({ locked = false }: { locked?: boolean }) {
       {/* Full-bleed video banner */}
       {locked ? null : (
       <div className="relative h-[60vh] min-h-[420px] w-full overflow-hidden">
-        <video
-          className="absolute inset-0 size-full object-cover"
-          poster="/hero-4.webp"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          aria-hidden
-        >
-          <source src="/videos/footer.mp4" type="video/mp4" />
-        </video>
+        <LazyVideo src="/videos/footer.mp4" poster="/hero-4.webp" />
         <div className="absolute inset-0 bg-black/35" />
 
         <div className="relative flex h-full flex-col items-center justify-center px-5 text-center text-white">

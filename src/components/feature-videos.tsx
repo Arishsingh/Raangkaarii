@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LazyVideo } from "@/components/lazy-video";
 
 /**
  * Background clips live in /public/videos. Until a clip is added the poster
@@ -45,18 +46,11 @@ export function FeatureVideos() {
               key={feature.title}
               className="group relative aspect-[5/7] overflow-hidden rounded-2xl bg-muted"
             >
-              <video
-                className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+              <LazyVideo
+                src={feature.video}
                 poster={feature.poster}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                aria-hidden
-              >
-                <source src={feature.video} type="video/mp4" />
-              </video>
+                className="transition-transform duration-700 group-hover:scale-[1.03]"
+              />
 
               {/* Scrims so the copy stays readable over any frame. */}
               <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-black/55 to-transparent" />
