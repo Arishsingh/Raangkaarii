@@ -1,8 +1,31 @@
 import Razorpay from "razorpay";
 import { currentUser } from "@clerk/nextjs/server";
 
-import { saveOrder } from "@/lib/orders-store";
+import { saveOrder, type StoredAddress } from "@/lib/orders-store";
 import { priceCart } from "@/lib/pricing";
+
+/** Only the fields a courier needs; anything else the browser sends is dropped. */
+function readAddress(value: unknown): StoredAddress | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const text = (key: string) => String(raw[key] ?? "").trim();
+
+  const address = {
+    name: text("name"),
+    phone: text("phone").replace(/\D/g, ""),
+    line1: text("line1"),
+    locality: text("locality"),
+    city: text("city"),
+    state: text("state"),
+    pincode: text("pincode").replace(/\D/g, ""),
+  };
+
+  // A partial address cannot be shipped, so store nothing rather than a stub.
+  if (!address.name || !address.line1 || !address.city || address.pincode.length !== 6) {
+    return null;
+  }
+  return address;
+}
 
 /**
  * Creates a Razorpay order and the pending order row that goes with it.
@@ -28,8 +51,9 @@ export async function POST(request: Request) {
   if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
 
   let lines: unknown;
+  let addressInput: unknown;
   try {
-    ({ lines } = await request.json());
+    ({ lines, address: addressInput } = await request.json());
   } catch {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -74,6 +98,7 @@ export async function POST(request: Request) {
       subtotal: cart.subtotal,
       delivery: cart.delivery,
       payable: cart.payable,
+      address: readAddress(addressInput),
     });
 
     return Response.json({

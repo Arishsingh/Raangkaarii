@@ -1,17 +1,46 @@
 import { currentUser } from "@clerk/nextjs/server";
 
-import { markOrderPaid, saveOrder } from "@/lib/orders-store";
+import {
+  markOrderPaid,
+  saveOrder,
+  type StoredAddress,
+} from "@/lib/orders-store";
 import { priceCart } from "@/lib/pricing";
 import { signatureValid } from "@/lib/razorpay";
 
 type Body = {
   id?: string;
+  address?: unknown;
   lines?: unknown;
   payment?: string;
   paymentId?: string;
   razorpayOrderId?: string;
   razorpaySignature?: string;
 };
+
+
+/** Only the fields a courier needs; anything else the browser sends is dropped. */
+function readAddress(value: unknown): StoredAddress | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const text = (key: string) => String(raw[key] ?? "").trim();
+
+  const address = {
+    name: text("name"),
+    phone: text("phone").replace(/\D/g, ""),
+    line1: text("line1"),
+    locality: text("locality"),
+    city: text("city"),
+    state: text("state"),
+    pincode: text("pincode").replace(/\D/g, ""),
+  };
+
+  // A partial address cannot be shipped, so store nothing rather than a stub.
+  if (!address.name || !address.line1 || !address.city || address.pincode.length !== 6) {
+    return null;
+  }
+  return address;
+}
 
 /**
  * Records an order once the shopper is through checkout.
@@ -84,6 +113,7 @@ export async function POST(request: Request) {
       subtotal: cart.subtotal,
       delivery: cart.delivery,
       payable: cart.payable,
+      address: readAddress(body.address),
     });
   } catch (caught) {
     console.error("Could not record order", caught);

@@ -2,6 +2,17 @@ import "server-only";
 
 import { getSql, isDatabaseConfigured } from "@/lib/db";
 
+/** Where the parcel goes. Needed before a courier shipment can be booked. */
+export type StoredAddress = {
+  name: string;
+  phone: string;
+  line1: string;
+  locality: string;
+  city: string;
+  state: string;
+  pincode: string;
+};
+
 export type StoredOrderLine = {
   id: string;
   name: string;
@@ -33,6 +44,9 @@ export type StoredOrder = {
   delivery: number;
   payable: number;
   placedAt: string;
+  address: StoredAddress | null;
+  /** Delhivery waybill, once a shipment has been booked for this order. */
+  waybill: string | null;
 };
 
 let schemaReady: Promise<void> | null = null;
@@ -68,6 +82,15 @@ export function ensureOrdersSchema() {
           add column if not exists status            text not null default 'paid',
           add column if not exists razorpay_order_id text
       `;
+      /**
+       * Shipping details arrived with the courier integration; older rows have
+       * no address, which is why every read has to tolerate null here.
+       */
+      await sql`
+        alter table orders
+          add column if not exists address jsonb,
+          add column if not exists waybill text
+      `;
       await sql`
         create index if not exists orders_placed_at_idx on orders (placed_at desc)
       `;
@@ -83,8 +106,12 @@ export function ensureOrdersSchema() {
   return schemaReady;
 }
 
-type NewOrder = Omit<StoredOrder, "placedAt" | "razorpayOrderId"> & {
+type NewOrder = Omit<
+  StoredOrder,
+  "placedAt" | "razorpayOrderId" | "address" | "waybill"
+> & {
   razorpayOrderId?: string | null;
+  address?: StoredAddress | null;
 };
 
 /** Writes throw so checkout can log a failed record without silently losing it. */
@@ -94,12 +121,13 @@ export async function saveOrder(order: NewOrder) {
   await sql`
     insert into orders (
       id, user_id, email, name, lines, payment, payment_id, razorpay_order_id,
-      status, items, subtotal, delivery, payable
+      status, items, subtotal, delivery, payable, address
     ) values (
       ${order.id}, ${order.userId}, ${order.email}, ${order.name},
       ${JSON.stringify(order.lines)}::jsonb, ${order.payment}, ${order.paymentId},
       ${order.razorpayOrderId ?? null}, ${order.status},
-      ${order.items}, ${order.subtotal}, ${order.delivery}, ${order.payable}
+      ${order.items}, ${order.subtotal}, ${order.delivery}, ${order.payable},
+      ${order.address ? JSON.stringify(order.address) : null}::jsonb
     )
     on conflict (id) do nothing
   `;
@@ -175,6 +203,8 @@ type OrderRow = {
   delivery: number;
   payable: number;
   placed_at: string | Date;
+  address: StoredAddress | null;
+  waybill: string | null;
 };
 
 function toOrder(row: OrderRow): StoredOrder {
@@ -193,6 +223,8 @@ function toOrder(row: OrderRow): StoredOrder {
     delivery: row.delivery,
     payable: row.payable,
     placedAt: new Date(row.placed_at).toISOString(),
+    address: row.address ?? null,
+    waybill: row.waybill ?? null,
   };
 }
 
@@ -278,5 +310,27 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
   } catch (caught) {
     console.error("Could not load revenue", caught);
     return { ...EMPTY, error: "Could not read orders from the database." };
+  }
+}
+
+/** Records the courier waybill once a shipment has been booked. */
+export async function setOrderWaybill(orderId: string, waybill: string) {
+  await ensureOrdersSchema();
+  const sql = getSql();
+  await sql`update orders set waybill = ${waybill} where id = ${orderId}`;
+}
+
+export async function getOrder(orderId: string): Promise<StoredOrder | null> {
+  if (!isDatabaseConfigured()) return null;
+  try {
+    await ensureOrdersSchema();
+    const sql = getSql();
+    const rows = (await sql`
+      select * from orders where id = ${orderId} limit 1
+    `) as OrderRow[];
+    return rows[0] ? toOrder(rows[0]) : null;
+  } catch (caught) {
+    console.error("Could not load the order", caught);
+    return null;
   }
 }
