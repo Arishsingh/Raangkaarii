@@ -78,9 +78,6 @@ export function ShopFilters({
                         ) : null}
                       </span>
                       <span className="flex-1">{option.label}</span>
-                      <span className="text-xs font-light text-foreground/45">
-                        {option.count}
-                      </span>
                     </label>
                   </li>
                 );
