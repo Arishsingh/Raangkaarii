@@ -34,11 +34,11 @@ export const FABRICS = ["Cotton", "Cotton Voile", "Cotton Gauze", "Satin", "Line
 export const COLOURS = ["Cream", "Green", "Rosewater", "Pale Blue", "Navy", "Crimson"];
 export const PRINTS = ["Floral", "Gingham", "Striped", "Animal", "Plain"];
 const IMAGES = [
-  { src: "/hero.png", alt: "Model in printed cotton pyjamas" },
-  { src: "/hero-3.png", alt: "Model in a printed cotton nightdress" },
-  { src: "/hero-4.png", alt: "Model in a crimson embroidered set" },
-  { src: "/hero-5.png", alt: "Model in a red velvet kurta set" },
-  { src: "/hero-2.png", alt: "Model in an embroidered kurta" },
+  { src: "/hero.webp", alt: "Model in printed cotton pyjamas" },
+  { src: "/hero-3.webp", alt: "Model in a printed cotton nightdress" },
+  { src: "/hero-4.webp", alt: "Model in a crimson embroidered set" },
+  { src: "/hero-5.webp", alt: "Model in a red velvet kurta set" },
+  { src: "/hero-2.webp", alt: "Model in an embroidered kurta" },
 ];
 
 /** Deterministic pseudo-random so server and client render the same catalogue. */

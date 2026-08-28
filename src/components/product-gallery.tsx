@@ -90,16 +90,23 @@ export function ProductGallery({
                   />
                 ) : (
                   <>
-                    {/* metadata alone is enough to paint the opening frame. */}
-                    <video
-                      src={item.url}
-                      preload="metadata"
-                      muted
-                      playsInline
-                      aria-hidden
-                      className="h-full w-full bg-black object-cover"
-                    />
-                    <span className="absolute inset-0 grid place-items-center bg-black/25">
+                    {/**
+                     * The product's still stands in for a clip's thumbnail.
+                     * Painting these from the clips themselves meant a request
+                     * per video before the shopper had asked for any of them.
+                     */}
+                    {image ? (
+                      <Image
+                        src={image}
+                        alt=""
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="absolute inset-0 bg-foreground/80" />
+                    )}
+                    <span className="absolute inset-0 grid place-items-center bg-black/30">
                       <Play className="size-4 fill-white text-white" strokeWidth={0} />
                     </span>
                   </>

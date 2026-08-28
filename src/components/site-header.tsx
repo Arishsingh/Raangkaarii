@@ -406,7 +406,7 @@ export function SiteHeader({
               className="group relative hidden w-[240px] shrink-0 overflow-hidden xl:block"
             >
               <Image
-                src="/hero-3.png"
+                src="/hero-3.webp"
                 alt="Woman choosing a piece from a linen-filled wardrobe"
                 fill
                 sizes="240px"

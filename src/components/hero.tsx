@@ -10,28 +10,28 @@ import { cn } from "@/lib/utils";
 
 const slides = [
   {
-    image: "/hero.png",
+    image: "/hero.webp",
     alt: "Rails of curated vintage clothing in a boutique",
     tagline: "New shapes, fresh prints, instant favourites.",
     cta: "SHOP NEW IN",
     href: "/new-in",
   },
   {
-    image: "/hero-3.png",
+    image: "/hero-3.webp",
     alt: "Woman choosing a piece from a linen-filled wardrobe",
     tagline: "A wardrobe you reach for without thinking.",
     cta: "SHOP THE EDIT",
     href: "/womens",
   },
   {
-    image: "/hero-4.png",
+    image: "/hero-4.webp",
     alt: "Model in a crimson kurta and organza dupatta on a studio backdrop",
     tagline: "Gold thread, deep crimson, occasion-ready.",
     cta: "SHOP FESTIVE",
     href: "/new-in",
   },
   {
-    image: "/hero-5.png",
+    image: "/hero-5.webp",
     alt: "Model in a red velvet kurta and patiala beside an arched window",
     tagline: "Velvet and shalwar, cut for evening light.",
     cta: "SHOP EVENING",

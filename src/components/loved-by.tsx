@@ -8,32 +8,32 @@ const reels = [
   {
     lines: ["Everyday Comfort.", "Effortless Drape."],
     video: "/videos/reel-1.mp4",
-    poster: "/hero-2.png",
+    poster: "/hero-2.webp",
   },
   {
     lines: ["True to Size.", "Perfect Fit."],
     video: "/videos/reel-2.mp4",
-    poster: "/hero-3.png",
+    poster: "/hero-3.webp",
   },
   {
     lines: ["Hand Embroidery.", "Worth the Wait."],
     video: "/videos/reel-3.mp4",
-    poster: "/hero-4.png",
+    poster: "/hero-4.webp",
   },
   {
     lines: ["Soft Cotton Voile.", "Wears Beautifully."],
     video: "/videos/reel-4.mp4",
-    poster: "/hero-5.png",
+    poster: "/hero-5.webp",
   },
   {
     lines: ["Festive Ready.", "Endless Compliments."],
     video: "/videos/reel-5.mp4",
-    poster: "/hero.png",
+    poster: "/hero.webp",
   },
   {
     lines: ["Beautifully Wrapped.", "Arrived Early."],
     video: "/videos/reel-6.mp4",
-    poster: "/hero-2.png",
+    poster: "/hero-2.webp",
   },
 ];
 

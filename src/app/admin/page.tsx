@@ -8,7 +8,7 @@ import { categories, fabrics, sizeChoices } from "@/lib/products";
 
 export const metadata = { title: "Add product — Admin" };
 
-const IMAGES = ["/hero.png", "/hero-2.png", "/hero-3.png", "/hero-4.png", "/hero-5.png"];
+const IMAGES = ["/hero.webp", "/hero-2.webp", "/hero-3.webp", "/hero-4.webp", "/hero-5.webp"];
 
 export default async function AdminProductsPage({
   searchParams,

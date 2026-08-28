@@ -61,7 +61,7 @@ export function CraftStory() {
           <video
             ref={videoRef}
             className="size-full object-cover"
-            poster="/hero-5.png"
+            poster="/hero-5.webp"
             autoPlay
             muted
             loop

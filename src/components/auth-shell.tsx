@@ -17,7 +17,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
       <div className="relative hidden lg:block">
         <Image
-          src="/hero-3.png"
+          src="/hero-3.webp"
           alt="Woman choosing a piece from a linen-filled wardrobe"
           fill
           sizes="50vw"

@@ -59,7 +59,7 @@ export function SiteFooter({ locked = false }: { locked?: boolean }) {
       <div className="relative h-[60vh] min-h-[420px] w-full overflow-hidden">
         <video
           className="absolute inset-0 size-full object-cover"
-          poster="/hero-4.png"
+          poster="/hero-4.webp"
           autoPlay
           muted
           loop

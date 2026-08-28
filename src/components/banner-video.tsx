@@ -147,7 +147,14 @@ export function BannerVideo({
         loop={!full}
         controls={full}
         playsInline
-        preload="metadata"
+        /**
+         * A poster means nothing of the clip is needed to paint the card, so
+         * fetch none of it until the shopper actually asks. On a grid of
+         * products that is the difference between one request per card and
+         * none. Without a poster there is nothing else to show, so metadata
+         * still has to come down for the first frame.
+         */
+        preload={poster ? "none" : "metadata"}
         aria-label={label}
         onTimeUpdate={handleTimeUpdate}
         onEnded={backToPreview}
