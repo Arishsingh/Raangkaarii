@@ -102,9 +102,15 @@ export function BannerVideo({
         aria-label={label}
         onTimeUpdate={handleTimeUpdate}
         onEnded={backToPreview}
-      >
-        <source src={src} type="video/mp4" />
-      </video>
+        /**
+         * src goes on the element, not a <source type=…>. The uploader accepts
+         * webm and quicktime as well as mp4, and declaring the wrong type made
+         * the browser refuse the file outright — "No video with supported
+         * format and MIME type found". Left to itself it trusts the
+         * Content-Type the blob is served with.
+         */
+        src={src}
+      />
 
       <button
         type="button"
