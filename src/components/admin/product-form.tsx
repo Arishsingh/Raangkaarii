@@ -25,6 +25,8 @@ export type HeadingOption = { slug: string; title: string };
 export type FormOptions = {
   categories: string[];
   collections: HeadingOption[];
+  /** Fabrics already in use, offered as suggestions — a new one can be typed. */
+  fabrics: string[];
   images: string[];
   sizes: string[];
 };
@@ -233,19 +235,38 @@ export function ProductForm({
         description="Where the product shows up. Fill in either one, or both."
       >
         <div className="space-y-4">
-          <Field
-            label="Category"
-            hint="Its heading in the shop customers see when signed in."
-          >
-            <Select name="category" defaultValue={editing?.category ?? ""}>
-              <option value="">— not listed in the shop —</option>
-              {options.categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Category"
+              hint="Its heading in the shop customers see when signed in."
+            >
+              <Select name="category" defaultValue={editing?.category ?? ""}>
+                <option value="">— not listed in the shop —</option>
+                {options.categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field
+              label="Fabric"
+              hint="Pick one already in use or type a new one. It drives the shop's Fabric filter. Defaults to Cotton."
+            >
+              <TextInput
+                name="fabric"
+                list="fabric-options"
+                defaultValue={editing?.fabric ?? ""}
+                placeholder="Cotton Voile"
+              />
+              <datalist id="fabric-options">
+                {options.fabrics.map((fabric) => (
+                  <option key={fabric} value={fabric} />
+                ))}
+              </datalist>
+            </Field>
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
