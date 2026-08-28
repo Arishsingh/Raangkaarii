@@ -7,7 +7,13 @@ import { useRouter } from "next/navigation";
 import { Check, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { CheckChip, Field, Select, TextInput } from "@/components/admin/field";
+import {
+  CheckChip,
+  Field,
+  Select,
+  TextArea,
+  TextInput,
+} from "@/components/admin/field";
 import { MediaUpload } from "@/components/admin/media-upload";
 import { Button } from "@/components/ui/button";
 import { saveProduct } from "@/app/admin/actions";
@@ -168,7 +174,10 @@ export function ProductForm({
         </div>
       </Section>
 
-      <Section title="Name and price" description="What the customer sees on the card.">
+      <Section
+        title="Name, price and description"
+        description="What the customer sees on the card."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name">
             <TextInput
@@ -187,6 +196,18 @@ export function ProductForm({
               required
               defaultValue={editing?.price}
               placeholder="4200"
+            />
+          </Field>
+          <Field
+            label="Description"
+            hint="One line under the name, on the card and the product page. Optional."
+            className="sm:col-span-2"
+          >
+            <TextArea
+              name="blurb"
+              rows={2}
+              defaultValue={editing?.blurb}
+              placeholder="Cotton voile kurta with hand-worked thread detail"
             />
           </Field>
         </div>
