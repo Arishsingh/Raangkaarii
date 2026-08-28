@@ -57,6 +57,15 @@ export function ProductDetail({
   const cart = useCart();
   const saved = wishlist?.has(product.id) ?? false;
 
+  // Only a was-price above what is actually charged is an offer worth showing.
+  const offer =
+    product.compareAt && product.compareAt > product.price
+      ? {
+          was: product.compareAt,
+          percent: Math.round((1 - product.price / product.compareAt) * 100),
+        }
+      : null;
+
   const [reviews, setReviews] = React.useState<Review[]>([]);
   const [size, setSize] = React.useState(product.sizes[0]);
   const [rating, setRating] = React.useState(5);
@@ -151,9 +160,19 @@ export function ProductDetail({
             </span>
           </div>
 
-          <p className="mt-5 text-2xl">
-            ₹{product.price.toLocaleString("en-IN")}
-          </p>
+          <div className="mt-5 flex flex-wrap items-baseline gap-3">
+            <p className="text-2xl">₹{product.price.toLocaleString("en-IN")}</p>
+            {offer ? (
+              <>
+                <p className="text-lg font-light text-foreground/45 line-through">
+                  ₹{offer.was.toLocaleString("en-IN")}
+                </p>
+                <span className="bg-destructive px-2 py-0.5 text-xs font-medium text-white">
+                  {offer.percent}% off
+                </span>
+              </>
+            ) : null}
+          </div>
           <p className="mt-4 text-sm font-light leading-relaxed text-foreground/70">
             {product.blurb}
           </p>

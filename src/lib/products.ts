@@ -5,6 +5,8 @@ export type Product = {
   name: string;
   blurb: string;
   price: number;
+  /** Optional was-price, struck through beside the price as a special offer. */
+  compareAt?: number;
   category: string;
   fabric: string;
   colour: string;

@@ -57,6 +57,7 @@ function toShopProduct(entry: AdminProduct): ShopProduct {
     name: entry.name,
     blurb: entry.blurb,
     price: entry.price,
+    compareAt: entry.compareAt ?? undefined,
     category: shopCategory(entry),
     fabric: entry.fabric,
     colour: entry.colour,

@@ -188,7 +188,7 @@ export function ProductForm({
               placeholder="Hand-Embroidered Kurta Set"
             />
           </Field>
-          <Field label="Price (₹)">
+          <Field label="Price (₹)" hint="What the customer actually pays.">
             <TextInput
               name="price"
               type="number"
@@ -197,6 +197,20 @@ export function ProductForm({
               required
               defaultValue={editing?.price}
               placeholder="4200"
+            />
+          </Field>
+          <Field
+            label="Was price (₹)"
+            hint="Optional. Shown crossed out beside the price, with the saving worked out. Leave empty for no offer."
+            className="sm:col-span-2"
+          >
+            <TextInput
+              name="compareAt"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={editing?.compareAt ?? ""}
+              placeholder="5600"
             />
           </Field>
           <Field
