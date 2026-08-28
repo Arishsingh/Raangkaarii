@@ -1,20 +1,22 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 
 import { getAdminUser } from "@/lib/admin";
+import {
+  IMAGE_TYPES,
+  VIDEO_TYPES,
+  limitFor,
+  typesFor,
+  type MediaKind,
+} from "@/lib/media-limits";
 
-/** Kept in step with the `accept` attributes on the admin form's file inputs. */
-export const IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-  "image/gif",
-];
-
-export const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
-
-/** Vercel Functions cap request bodies, but client uploads go straight to Blob. */
-const MAX_BYTES = 500 * 1024 * 1024;
+/**
+ * The uploader says which kind it is sending, so the token can be minted for
+ * that kind alone. Without it the token would have to allow the largest limit
+ * for everything, and a photo could be used to push up a 100 MB file.
+ */
+function kindFrom(payload: string | null): MediaKind | null {
+  return payload === "image" || payload === "video" ? payload : null;
+}
 
 export async function POST(request: Request) {
   const body = (await request.json()) as HandleUploadBody;
@@ -27,13 +29,18 @@ export async function POST(request: Request) {
        * This runs on the token request, which carries the browser's cookies —
        * so only the signed-in admin can ever mint an upload token.
        */
-      onBeforeGenerateToken: async () => {
+      onBeforeGenerateToken: async (_pathname, clientPayload) => {
         const admin = await getAdminUser();
         if (!admin) throw new Error("Not authorised.");
 
+        // An older client sends no payload; fall back to accepting either.
+        const kind = kindFrom(clientPayload);
+
         return {
-          allowedContentTypes: [...IMAGE_TYPES, ...VIDEO_TYPES],
-          maximumSizeInBytes: MAX_BYTES,
+          allowedContentTypes: kind
+            ? typesFor(kind)
+            : [...IMAGE_TYPES, ...VIDEO_TYPES],
+          maximumSizeInBytes: kind ? limitFor(kind) : limitFor("video"),
           // Two products named the same must not overwrite each other's media.
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({ uploadedBy: admin.id }),

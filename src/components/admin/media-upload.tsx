@@ -6,20 +6,13 @@ import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  limitFor,
+  prettySize,
+  typesFor,
+  type MediaKind,
+} from "@/lib/media-limits";
 import { checkVideoCodec } from "@/lib/video-codec";
-
-const ACCEPT = {
-  image: "image/jpeg,image/png,image/webp,image/avif,image/gif",
-  video: "video/mp4,video/webm,video/quicktime",
-} as const;
-
-/** Matches maximumSizeInBytes in the upload route. */
-const MAX_BYTES = 500 * 1024 * 1024;
-
-function prettySize(bytes: number) {
-  const mb = bytes / (1024 * 1024);
-  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
-}
 
 /**
  * Uploads straight from the browser to Vercel Blob. The file never passes
@@ -29,7 +22,7 @@ export function MediaUpload({
   kind,
   onUploaded,
 }: {
-  kind: "image" | "video";
+  kind: MediaKind;
   onUploaded: (url: string) => void;
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -42,9 +35,23 @@ export function MediaUpload({
   /** Uploads one file, returning its URL, or null when it was rejected. */
   const uploadOne = async (file: File): Promise<string | null> => {
 
-    if (file.size > MAX_BYTES) {
+    const limit = limitFor(kind);
+    if (file.size > limit) {
+      /**
+       * The whole Blob store is 1 GB, so an oversized file is not a matter of
+       * waiting longer — it would not fit. A file this far over is invariably
+       * an edit-quality export rather than something meant for the web, so say
+       * what to do about it rather than only quoting the number back.
+       */
       toast.error(
-        `${file.name} is ${prettySize(file.size)}. The limit is ${prettySize(MAX_BYTES)}.`,
+        `${file.name} is ${prettySize(file.size)}. The limit is ${prettySize(limit)}.`,
+        {
+          description:
+            kind === "video"
+              ? "That is an editing export, not a web video. Export it again as H.264 MP4 at 1080p — a minute comes out near 50 MB, and it will look the same on a phone."
+              : "Save it as a JPEG or WebP at around 2000px on the long edge.",
+          duration: 12000,
+        },
       );
       return null;
     }
@@ -76,6 +83,8 @@ export function MediaUpload({
       const blob = await upload(`products/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/admin/upload",
+        // Lets the route mint a token for this kind alone.
+        clientPayload: kind,
         onUploadProgress: ({ percentage }) => setProgress(percentage),
       });
       return blob.url;
@@ -129,7 +138,7 @@ export function MediaUpload({
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT[kind]}
+        accept={typesFor(kind).join(",")}
         multiple
         className="hidden"
         onChange={(event) => choose(event.target.files)}
