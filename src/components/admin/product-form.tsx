@@ -26,6 +26,7 @@ export type FormOptions = {
   categories: string[];
   collections: HeadingOption[];
   images: string[];
+  sizes: string[];
 };
 
 function Section({
@@ -262,6 +263,26 @@ export function ProductForm({
             </div>
           </div>
         </div>
+      </Section>
+
+      <Section
+        title="Sizes"
+        description="What the customer can pick on the product page."
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {options.sizes.map((size) => (
+            <CheckChip
+              key={size}
+              name="sizes"
+              value={size}
+              label={size}
+              defaultChecked={editing?.sizes.includes(size)}
+            />
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Leave every one unticked to offer XS to XXL.
+        </p>
       </Section>
 
       <div className="flex items-center gap-3">

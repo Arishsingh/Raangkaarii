@@ -4,7 +4,7 @@ import { ProductForm, type FormOptions } from "@/components/admin/product-form";
 import { listAdminProducts } from "@/lib/catalog-store";
 import { collectionHeadings } from "@/lib/collections";
 import { isDatabaseConfigured } from "@/lib/db";
-import { categories } from "@/lib/products";
+import { categories, sizeChoices } from "@/lib/products";
 
 export const metadata = { title: "Add product — Admin" };
 
@@ -26,6 +26,7 @@ export default async function AdminProductsPage({
     categories: [...categories].sort(),
     collections: headings,
     images: IMAGES,
+    sizes: sizeChoices,
   };
 
   return (

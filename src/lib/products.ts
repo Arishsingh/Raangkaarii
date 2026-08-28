@@ -57,6 +57,9 @@ function countBy(list: Product[], field: keyof Product) {
 
 const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "One Size"];
 
+/** What the admin form offers when filing a piece. */
+export const sizeChoices = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "One Size"];
+
 /** Every admin-added piece carries this, so new stock is one click away. */
 export const JUST_ADDED = "Just added";
 
