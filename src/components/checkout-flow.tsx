@@ -55,13 +55,18 @@ export function CheckoutFlow() {
 
   const [step, setStep] = React.useState(0);
   const [address, setAddress] = React.useState<Address>(EMPTY);
-  const [serviceability, setServiceability] = React.useState<{
-    checking: boolean;
+  /**
+   * The answer carries the pincode it belongs to, so "still checking" is
+   * derived from comparing it with what is typed rather than held as its own
+   * flag — which keeps the effect below free of a synchronous setState.
+   */
+  const [lookup, setLookup] = React.useState<{
+    pincode: string;
     serviceable: boolean | null;
     cod: boolean;
     city: string;
     state: string;
-  }>({ checking: false, serviceable: null, cod: true, city: "", state: "" });
+  }>({ pincode: "", serviceable: null, cod: true, city: "", state: "" });
   const [payment, setPayment] = React.useState<"Razorpay" | "Cash on Delivery">("Razorpay");
   const [scriptReady, setScriptReady] = React.useState(false);
   const [pending, setPending] = React.useState(false);
@@ -87,42 +92,28 @@ export function CheckoutFlow() {
   const pincode = address.pincode.replace(/\D/g, "");
 
   React.useEffect(() => {
-    if (pincode.length !== 6) {
-      setServiceability((prev) => ({ ...prev, serviceable: null, checking: false }));
-      return;
-    }
+    if (pincode.length !== 6) return;
 
     // A later keystroke must win, so a stale reply is discarded.
     let current = true;
-    setServiceability((prev) => ({ ...prev, checking: true }));
 
     fetch(`/api/delhivery/serviceability?pincode=${pincode}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (!current) return;
-        if (!data) {
-          setServiceability({
-            checking: false,
-            serviceable: null,
-            cod: true,
-            city: "",
-            state: "",
-          });
-          return;
-        }
-        setServiceability({
-          checking: false,
-          serviceable: Boolean(data.serviceable),
-          cod: Boolean(data.cod),
-          city: data.city ?? "",
-          state: data.state ?? "",
+        setLookup({
+          pincode,
+          // A courier outage leaves this unknown rather than "not serviceable".
+          serviceable: data ? Boolean(data.serviceable) : null,
+          cod: data ? Boolean(data.cod) : true,
+          city: data?.city ?? "",
+          state: data?.state ?? "",
         });
       })
       .catch(() => {
-        // A courier outage must not block checkout, so this stays silent.
         if (current) {
-          setServiceability({
-            checking: false,
+          setLookup({
+            pincode,
             serviceable: null,
             cod: true,
             city: "",
@@ -135,6 +126,11 @@ export function CheckoutFlow() {
       current = false;
     };
   }, [pincode]);
+
+  const answered = lookup.pincode === pincode ? lookup : null;
+  const checkingPincode = pincode.length === 6 && !answered;
+  const serviceable = answered?.serviceable ?? null;
+  const codAvailable = answered ? answered.cod : true;
 
   const complete = async (receipt?: RazorpayResponse, serverId?: string) => {
     const paymentId = receipt?.razorpay_payment_id;
@@ -184,7 +180,7 @@ export function CheckoutFlow() {
   const submitAddress = (event: React.FormEvent) => {
     event.preventDefault();
     // Only a confirmed "no" blocks; an unreachable courier must not stop a sale.
-    if (serviceability.serviceable === false) {
+    if (serviceable === false) {
       toast.error(`We cannot deliver to ${pincode} yet.`);
       return;
     }
@@ -195,7 +191,7 @@ export function CheckoutFlow() {
   const placeOrder = async () => {
     if (pending || rows.length === 0) return;
 
-    if (payment === "Cash on Delivery" && !serviceability.cod) {
+    if (payment === "Cash on Delivery" && !codAvailable) {
       toast.error("Cash on delivery is not available at this pincode.");
       return;
     }
@@ -339,19 +335,19 @@ export function CheckoutFlow() {
                       <Field label="Locality" id="locality" value={address.locality} onChange={(v) => setAddress({ ...address, locality: v })} />
                     </div>
 
-                    {serviceability.checking ? (
+                    {checkingPincode ? (
                       <p className="text-xs text-muted-foreground">
                         Checking delivery to {pincode}…
                       </p>
-                    ) : serviceability.serviceable === true ? (
+                    ) : serviceable === true ? (
                       <p className="text-xs text-muted-foreground">
-                        We deliver to {serviceability.city || pincode}
-                        {serviceability.state ? `, ${serviceability.state}` : ""}.
-                        {serviceability.cod
+                        We deliver to {answered?.city || pincode}
+                        {answered?.state ? `, ${answered.state}` : ""}.
+                        {codAvailable
                           ? ""
                           : " Cash on delivery is not available here."}
                       </p>
-                    ) : serviceability.serviceable === false ? (
+                    ) : serviceable === false ? (
                       <p className="text-xs text-destructive">
                         Sorry, we cannot deliver to {pincode} yet.
                       </p>
