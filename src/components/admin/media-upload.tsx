@@ -6,6 +6,7 @@ import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { checkVideoCodec } from "@/lib/video-codec";
 
 const ACCEPT = {
   image: "image/jpeg,image/png,image/webp,image/avif,image/gif",
@@ -43,6 +44,29 @@ export function MediaUpload({
         `That file is ${prettySize(file.size)}. The limit is ${prettySize(MAX_BYTES)}.`,
       );
       return;
+    }
+
+    /**
+     * Refuse a codec no shopper's browser can decode, rather than storing a
+     * clip that plays for whoever uploaded it and shows "No video with
+     * supported format and MIME type found" to everyone on Chrome.
+     *
+     * These clips are saved off Instagram, so the format is not ours to choose
+     * — Instagram serves some reels as HEVC, and a downloader passes through
+     * whatever it was handed. The message therefore has to point at converting
+     * the file, not at a capture setting.
+     */
+    if (kind === "video") {
+      const codec = await checkVideoCodec(file);
+      if (!codec.ok) {
+        toast.error(`This clip is ${codec.label}, which Chrome and Android cannot play.`, {
+          description:
+            "Convert it to H.264 MP4 and upload again — saving the reel from Instagram on a desktop browser usually gives you one, or run this file through any converter set to H.264.",
+          duration: 12000,
+        });
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
     }
 
     setBusy(true);

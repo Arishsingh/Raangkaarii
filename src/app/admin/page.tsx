@@ -4,7 +4,7 @@ import { ProductForm, type FormOptions } from "@/components/admin/product-form";
 import { listAdminProducts } from "@/lib/catalog-store";
 import { collectionHeadings } from "@/lib/collections";
 import { isDatabaseConfigured } from "@/lib/db";
-import { categories, sizeChoices } from "@/lib/products";
+import { categories, fabrics, sizeChoices } from "@/lib/products";
 
 export const metadata = { title: "Add product — Admin" };
 
@@ -25,6 +25,13 @@ export default async function AdminProductsPage({
   const options: FormOptions = {
     categories: [...categories].sort(),
     collections: headings,
+    // The built-in range plus anything already typed in, so a fabric only ever
+    // has to be spelled out once.
+    fabrics: [
+      ...new Set([...fabrics, ...added.map((entry) => entry.fabric)]),
+    ]
+      .filter(Boolean)
+      .sort(),
     images: IMAGES,
     sizes: sizeChoices,
   };
