@@ -2,6 +2,7 @@ import { CreditCard, IndianRupee, Receipt, TrendingUp } from "lucide-react";
 
 import { RevenueChart } from "@/components/admin/revenue-chart";
 import { StatCard } from "@/components/admin/stat-card";
+import { ShipButton } from "@/components/admin/ship-button";
 import { getRevenueStats } from "@/lib/orders-store";
 
 export const metadata = { title: "Revenue — Admin" };
@@ -77,7 +78,7 @@ export default async function AdminRevenuePage() {
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full min-w-[42rem] text-sm">
+            <table className="w-full min-w-[52rem] text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
                   <th className="px-4 py-3 font-medium">Order</th>
@@ -86,6 +87,7 @@ export default async function AdminRevenuePage() {
                   <th className="px-4 py-3 font-medium">Payment</th>
                   <th className="px-4 py-3 text-right font-medium">Total</th>
                   <th className="px-4 py-3 font-medium">Placed</th>
+                  <th className="px-4 py-3 font-medium">Shipping</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,6 +117,13 @@ export default async function AdminRevenuePage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {formatDateTime(order.placedAt)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <ShipButton
+                        orderId={order.id}
+                        waybill={order.waybill}
+                        shippable={Boolean(order.address)}
+                      />
                     </td>
                   </tr>
                 ))}

@@ -55,6 +55,13 @@ export function CheckoutFlow() {
 
   const [step, setStep] = React.useState(0);
   const [address, setAddress] = React.useState<Address>(EMPTY);
+  const [serviceability, setServiceability] = React.useState<{
+    checking: boolean;
+    serviceable: boolean | null;
+    cod: boolean;
+    city: string;
+    state: string;
+  }>({ checking: false, serviceable: null, cod: true, city: "", state: "" });
   const [payment, setPayment] = React.useState<"Razorpay" | "Cash on Delivery">("Razorpay");
   const [scriptReady, setScriptReady] = React.useState(false);
   const [pending, setPending] = React.useState(false);
@@ -76,6 +83,58 @@ export function CheckoutFlow() {
   const totals = priceBreakdown(subtotal, itemCount);
 
   const deliveryBy = Date.now() + 5 * 86_400_000;
+
+  const pincode = address.pincode.replace(/\D/g, "");
+
+  React.useEffect(() => {
+    if (pincode.length !== 6) {
+      setServiceability((prev) => ({ ...prev, serviceable: null, checking: false }));
+      return;
+    }
+
+    // A later keystroke must win, so a stale reply is discarded.
+    let current = true;
+    setServiceability((prev) => ({ ...prev, checking: true }));
+
+    fetch(`/api/delhivery/serviceability?pincode=${pincode}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!current) return;
+        if (!data) {
+          setServiceability({
+            checking: false,
+            serviceable: null,
+            cod: true,
+            city: "",
+            state: "",
+          });
+          return;
+        }
+        setServiceability({
+          checking: false,
+          serviceable: Boolean(data.serviceable),
+          cod: Boolean(data.cod),
+          city: data.city ?? "",
+          state: data.state ?? "",
+        });
+      })
+      .catch(() => {
+        // A courier outage must not block checkout, so this stays silent.
+        if (current) {
+          setServiceability({
+            checking: false,
+            serviceable: null,
+            cod: true,
+            city: "",
+            state: "",
+          });
+        }
+      });
+
+    return () => {
+      current = false;
+    };
+  }, [pincode]);
 
   const complete = async (receipt?: RazorpayResponse, serverId?: string) => {
     const paymentId = receipt?.razorpay_payment_id;
@@ -108,6 +167,8 @@ export function CheckoutFlow() {
           lines,
           payment,
           paymentId,
+          // The courier needs this; the row is unshippable without it.
+          address,
           razorpayOrderId: receipt?.razorpay_order_id,
           razorpaySignature: receipt?.razorpay_signature,
         }),
@@ -122,12 +183,22 @@ export function CheckoutFlow() {
 
   const submitAddress = (event: React.FormEvent) => {
     event.preventDefault();
+    // Only a confirmed "no" blocks; an unreachable courier must not stop a sale.
+    if (serviceability.serviceable === false) {
+      toast.error(`We cannot deliver to ${pincode} yet.`);
+      return;
+    }
     saveAddress(address);
     setStep(1);
   };
 
   const placeOrder = async () => {
     if (pending || rows.length === 0) return;
+
+    if (payment === "Cash on Delivery" && !serviceability.cod) {
+      toast.error("Cash on delivery is not available at this pincode.");
+      return;
+    }
 
     if (payment === "Cash on Delivery") {
       setPending(true);
@@ -140,7 +211,7 @@ export function CheckoutFlow() {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines }),
+        body: JSON.stringify({ lines, address }),
       });
       const order = await response.json();
       if (!response.ok) throw new Error(order.error ?? "Could not start payment.");
@@ -267,6 +338,24 @@ export function CheckoutFlow() {
                       <Field label="Pincode" id="pincode" value={address.pincode} onChange={(v) => setAddress({ ...address, pincode: v })} pattern="[0-9]{6}" hint="6 digits" />
                       <Field label="Locality" id="locality" value={address.locality} onChange={(v) => setAddress({ ...address, locality: v })} />
                     </div>
+
+                    {serviceability.checking ? (
+                      <p className="text-xs text-muted-foreground">
+                        Checking delivery to {pincode}…
+                      </p>
+                    ) : serviceability.serviceable === true ? (
+                      <p className="text-xs text-muted-foreground">
+                        We deliver to {serviceability.city || pincode}
+                        {serviceability.state ? `, ${serviceability.state}` : ""}.
+                        {serviceability.cod
+                          ? ""
+                          : " Cash on delivery is not available here."}
+                      </p>
+                    ) : serviceability.serviceable === false ? (
+                      <p className="text-xs text-destructive">
+                        Sorry, we cannot deliver to {pincode} yet.
+                      </p>
+                    ) : null}
                     <Field label="Address (house no, building, street)" id="line1" value={address.line1} onChange={(v) => setAddress({ ...address, line1: v })} />
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="City" id="city" value={address.city} onChange={(v) => setAddress({ ...address, city: v })} />
