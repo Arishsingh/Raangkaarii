@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCart } from "@/components/cart-provider";
-import { getProduct } from "@/lib/products";
+import type { Product } from "@/lib/products";
 import {
   loadAddress,
   newOrderId,
@@ -48,10 +48,27 @@ const EMPTY: Address = {
 
 const STEPS = ["Delivery address", "Order summary", "Payment"] as const;
 
-export function CheckoutFlow() {
+export function CheckoutFlow({
+  products,
+  deliveryBy,
+}: {
+  products: Product[];
+  /**
+   * Worked out on the server and passed in. Calling Date.now() while rendering
+   * gave the server and the browser two different answers for the same markup,
+   * which is a hydration mismatch as well as an impure render.
+   */
+  deliveryBy: number;
+}) {
   const router = useRouter();
   const cart = useCart();
   const lines = cart?.lines ?? [];
+
+  // Everything the admin panel has added, which the built-in list never saw.
+  const catalogue = React.useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products],
+  );
 
   const [step, setStep] = React.useState(0);
   const [address, setAddress] = React.useState<Address>(EMPTY);
@@ -77,7 +94,7 @@ export function CheckoutFlow() {
   }, []);
 
   const rows = lines
-    .map((line) => ({ line, product: getProduct(line.id) }))
+    .map((line) => ({ line, product: catalogue.get(line.id) ?? null }))
     .filter((row) => row.product !== null);
 
   const subtotal = rows.reduce(
@@ -86,8 +103,6 @@ export function CheckoutFlow() {
   );
   const itemCount = rows.reduce((total, row) => total + row.line.qty, 0);
   const totals = priceBreakdown(subtotal, itemCount);
-
-  const deliveryBy = Date.now() + 5 * 86_400_000;
 
   const pincode = address.pincode.replace(/\D/g, "");
 
@@ -138,7 +153,17 @@ export function CheckoutFlow() {
       // The server mints the id when it creates the pending row, so the copy
       // the shopper sees has to reuse it or their order page points at nothing.
       id: serverId ?? newOrderId(),
-      lines,
+      /**
+       * The name and price are copied in rather than left to be looked up on
+       * the order page. That page could only see the built-in range, so an
+       * admin-added piece showed as nothing at all — and even for the built-ins
+       * a later edit would have rewritten what the shopper was shown they paid.
+       */
+      lines: rows.map(({ line, product }) => ({
+        ...line,
+        name: product!.name,
+        price: product!.price,
+      })),
       address,
       payment,
       paymentId,

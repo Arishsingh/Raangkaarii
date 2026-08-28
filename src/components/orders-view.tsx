@@ -40,8 +40,10 @@ export function OrdersView() {
         <ul className="mt-6 space-y-4">
           {orders.map((order) => {
             const status = statusFor(order);
+            // Recorded name first; the lookup is only for older orders, and
+            // never knew anything added through the admin panel.
             const names = order.lines
-              .map((line) => getProduct(line.id)?.name)
+              .map((line) => line.name ?? getProduct(line.id)?.name)
               .filter(Boolean);
 
             return (

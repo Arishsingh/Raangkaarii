@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import Link from "next/link";
 import { ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,15 +9,22 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/cart-provider";
 import { PricePanel } from "@/components/checkout-flow";
-import { getProduct } from "@/lib/products";
+import type { Product } from "@/lib/products";
 import { priceBreakdown } from "@/lib/orders";
 
-export function CartView() {
+export function CartView({ products }: { products: Product[] }) {
   const cart = useCart();
   const lines = cart?.lines ?? [];
 
+  // Resolved against the catalogue the server sent, which includes everything
+  // added through the admin panel — the built-in list alone did not.
+  const catalogue = React.useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products],
+  );
+
   const rows = lines
-    .map((line) => ({ line, product: getProduct(line.id) }))
+    .map((line) => ({ line, product: catalogue.get(line.id) ?? null }))
     .filter((row) => row.product !== null);
 
   const subtotal = rows.reduce(

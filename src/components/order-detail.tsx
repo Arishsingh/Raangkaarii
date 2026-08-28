@@ -123,14 +123,23 @@ export function OrderDetail({ id }: { id: string }) {
             <h2 className="text-sm font-medium tracking-wide text-foreground/60">ITEMS</h2>
             <ul className="mt-4 space-y-4">
               {order.lines.map((line) => {
-                const product = getProduct(line.id);
-                if (!product) return null;
+                /**
+                 * What the order recorded wins. Falling back to the catalogue
+                 * dropped every admin-added piece from the list — getProduct
+                 * only ever knew the built-in range — and re-priced the rest
+                 * from today's catalogue instead of what was actually paid.
+                 * The lookup remains only for orders placed before lines
+                 * carried their own name and price.
+                 */
+                const fallback = getProduct(line.id);
+                const name = line.name ?? fallback?.name ?? "Item no longer listed";
+                const price = line.price ?? fallback?.price ?? 0;
                 return (
                   <li key={`${line.id}-${line.size}`} className="flex flex-wrap justify-between gap-3">
                     <div>
-                      <Link href={`/dashboard/product/${product.id}`}>
+                      <Link href={`/dashboard/product/${line.id}`}>
                         <p className="font-serif text-lg transition-opacity hover:opacity-70">
-                          {product.name}
+                          {name}
                         </p>
                       </Link>
                       <p className="mt-1 text-sm font-light text-foreground/60">
@@ -138,7 +147,7 @@ export function OrderDetail({ id }: { id: string }) {
                       </p>
                     </div>
                     <p className="text-sm">
-                      ₹{(product.price * line.qty).toLocaleString("en-IN")}
+                      ₹{(price * line.qty).toLocaleString("en-IN")}
                     </p>
                   </li>
                 );

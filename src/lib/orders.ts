@@ -1,5 +1,18 @@
 import type { CartLine } from "@/components/cart-provider";
 
+/**
+ * A line as it is recorded against an order.
+ *
+ * The name and price are copied in at checkout rather than looked up later: an
+ * order is a record of what was bought at the price paid, and resolving it
+ * against the live catalogue meant a renamed, re-priced or withdrawn product
+ * silently rewrote the shopper's own history — or, for anything added through
+ * the admin panel, rendered nothing at all.
+ *
+ * Optional because orders placed before this shipped carry only the id.
+ */
+export type OrderLine = CartLine & { name?: string; price?: number };
+
 export type Address = {
   name: string;
   phone: string;
@@ -23,7 +36,7 @@ export const ORDER_STAGES: OrderStatus[] = [
 
 export type Order = {
   id: string;
-  lines: CartLine[];
+  lines: OrderLine[];
   address: Address;
   payment: "Razorpay" | "Cash on Delivery";
   paymentId?: string;
@@ -85,6 +98,19 @@ export function getOrder(id: string) {
 export function statusFor(order: Order): OrderStatus {
   const days = Math.floor((Date.now() - order.placedAt) / 86_400_000);
   return ORDER_STAGES[Math.min(days, ORDER_STAGES.length - 1)];
+}
+
+/** Days from placing an order to the estimate a shopper is shown. */
+const DELIVERY_DAYS = 5;
+
+/**
+ * The delivery estimate. Worked out once on the server and handed to the
+ * checkout, so the markup rendered there and the markup hydrated in the browser
+ * agree on the date — and so the figure stored with the order is the same one
+ * the shopper was shown.
+ */
+export function estimatedDeliveryBy(from = Date.now()) {
+  return from + DELIVERY_DAYS * 86_400_000;
 }
 
 export function newOrderId() {
