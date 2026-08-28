@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Heart, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { ProductMedia } from "@/components/product-media";
+import { ProductGallery } from "@/components/product-gallery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,15 +133,13 @@ export function ProductDetail({
       </div>
 
       <div className="mt-6 grid items-start gap-10 lg:grid-cols-2">
-        <div className="relative aspect-[4/5] max-h-[560px] w-full overflow-hidden rounded-2xl border bg-muted">
-          <ProductMedia
-            image={product.image}
-            video={product.video}
-            alt={product.alt}
-            sizes="(min-width: 1024px) 560px, 90vw"
-            hoverToPlay={false}
-          />
-        </div>
+        <ProductGallery
+          image={product.image}
+          video={product.video}
+          images={product.images}
+          videos={product.videos}
+          alt={product.alt}
+        />
 
         <div>
           <p className="text-xs font-medium tracking-[0.18em] text-foreground/50">

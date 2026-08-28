@@ -9,9 +9,14 @@ export type AdminProduct = {
   blurb: string;
   price: number;
   compareAt: number | null;
+  /** The primary still — always `images[0]`, kept for cards and order lines. */
   image: string;
   /** Optional clip shown on the product page. Empty string means none. */
   video: string;
+  /** Every still, in the order the admin arranged them. */
+  images: string[];
+  /** Every clip, in the order the admin arranged them. */
+  videos: string[];
   alt: string;
   /** Dashboard shop heading. Empty string means "not listed in the shop". */
   category: string;
@@ -65,6 +70,17 @@ export function ensureSchema() {
         alter table admin_products
         add column if not exists video text not null default ''
       `;
+      /**
+       * A product carried exactly one still and one clip until galleries
+       * arrived. The singular columns stay as the primary of each set — cards,
+       * cart lines and past orders all read them — so an existing row needs no
+       * backfill: an empty array falls back to whatever the column holds.
+       */
+      await sql`
+        alter table admin_products
+          add column if not exists images text[] not null default '{}',
+          add column if not exists videos text[] not null default '{}'
+      `;
       // Built-in pieces live in the code, so "removing" one is recorded here.
       await sql`
         create table if not exists hidden_builtins (
@@ -89,6 +105,8 @@ type Row = {
   compare_at: number | null;
   image: string;
   video: string;
+  images: string[] | null;
+  videos: string[] | null;
   alt: string;
   category: string;
   collections: string[];
@@ -104,6 +122,13 @@ type Row = {
   created_at: string | Date;
 };
 
+/** An empty array on an older row means "whatever the singular column holds". */
+function fallback(list: string[] | null, single: string) {
+  const entries = (list ?? []).filter(Boolean);
+  if (entries.length > 0) return entries;
+  return single ? [single] : [];
+}
+
 function toProduct(row: Row): AdminProduct {
   return {
     id: row.id,
@@ -113,6 +138,9 @@ function toProduct(row: Row): AdminProduct {
     compareAt: row.compare_at,
     image: row.image,
     video: row.video ?? "",
+    // An older row predates the arrays; its single column is the whole set.
+    images: fallback(row.images, row.image),
+    videos: fallback(row.videos, row.video),
     alt: row.alt,
     category: row.category,
     collections: row.collections ?? [],
@@ -171,11 +199,13 @@ export async function upsertAdminProduct(input: ProductInput) {
   const sql = getSql();
   await sql`
     insert into admin_products (
-      id, name, blurb, price, compare_at, image, video, alt, category, collections,
+      id, name, blurb, price, compare_at, image, video, images, videos, alt,
+      category, collections,
       fabric, colour, occasion, style, print, sizes, badges, rating, in_stock
     ) values (
       ${input.id}, ${input.name}, ${input.blurb}, ${input.price},
-      ${input.compareAt}, ${input.image}, ${input.video}, ${input.alt}, ${input.category},
+      ${input.compareAt}, ${input.image}, ${input.video},
+      ${input.images}::text[], ${input.videos}::text[], ${input.alt}, ${input.category},
       ${input.collections}::text[], ${input.fabric}, ${input.colour},
       ${input.occasion}, ${input.style}, ${input.print}, ${input.sizes}::text[],
       ${input.badges}::text[], ${input.rating}, ${input.inStock}
@@ -187,6 +217,8 @@ export async function upsertAdminProduct(input: ProductInput) {
       compare_at = excluded.compare_at,
       image = excluded.image,
       video = excluded.video,
+      images = excluded.images,
+      videos = excluded.videos,
       alt = excluded.alt,
       category = excluded.category,
       collections = excluded.collections,

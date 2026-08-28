@@ -35,15 +35,18 @@ export function MediaUpload({
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [busy, setBusy] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
+  /** Which file of the batch is going up, so a multi-file pick reads clearly. */
+  const [done, setDone] = React.useState(0);
+  const [total, setTotal] = React.useState(0);
 
-  const choose = async (file: File | undefined) => {
-    if (!file) return;
+  /** Uploads one file, returning its URL, or null when it was rejected. */
+  const uploadOne = async (file: File): Promise<string | null> => {
 
     if (file.size > MAX_BYTES) {
       toast.error(
-        `That file is ${prettySize(file.size)}. The limit is ${prettySize(MAX_BYTES)}.`,
+        `${file.name} is ${prettySize(file.size)}. The limit is ${prettySize(MAX_BYTES)}.`,
       );
-      return;
+      return null;
     }
 
     /**
@@ -64,12 +67,10 @@ export function MediaUpload({
             "Convert it to H.264 MP4 and upload again — saving the reel from Instagram on a desktop browser usually gives you one, or run this file through any converter set to H.264.",
           duration: 12000,
         });
-        if (inputRef.current) inputRef.current.value = "";
-        return;
+        return null;
       }
     }
 
-    setBusy(true);
     setProgress(0);
     try {
       const blob = await upload(`products/${file.name}`, file, {
@@ -77,17 +78,49 @@ export function MediaUpload({
         handleUploadUrl: "/api/admin/upload",
         onUploadProgress: ({ percentage }) => setProgress(percentage),
       });
-      onUploaded(blob.url);
-      toast.success(`Uploaded ${file.name}`);
+      return blob.url;
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : "Upload failed.";
-      toast.error(message);
+      toast.error(`${file.name}: ${message}`);
+      return null;
+    }
+  };
+
+  /**
+   * Files go up one at a time rather than in parallel: these are large clips,
+   * and a handful of concurrent multi-hundred-megabyte uploads is a good way to
+   * stall the tab. Sequential also keeps the progress bar meaningful.
+   */
+  const choose = async (picked: FileList | null) => {
+    const files = [...(picked ?? [])];
+    if (files.length === 0) return;
+
+    setBusy(true);
+    setDone(0);
+    setTotal(files.length);
+    let added = 0;
+    try {
+      for (const [index, file] of files.entries()) {
+        setDone(index);
+        const url = await uploadOne(file);
+        // One rejected file must not abandon the rest of the selection.
+        if (url) {
+          onUploaded(url);
+          added += 1;
+        }
+      }
     } finally {
       setBusy(false);
       setProgress(0);
+      setDone(0);
+      setTotal(0);
       // Let the same file be picked again after a failure.
       if (inputRef.current) inputRef.current.value = "";
+    }
+
+    if (added > 0) {
+      toast.success(`Uploaded ${added} ${kind}${added === 1 ? "" : "s"}.`);
     }
   };
 
@@ -97,8 +130,9 @@ export function MediaUpload({
         ref={inputRef}
         type="file"
         accept={ACCEPT[kind]}
+        multiple
         className="hidden"
-        onChange={(event) => choose(event.target.files?.[0])}
+        onChange={(event) => choose(event.target.files)}
       />
       <Button
         type="button"
@@ -108,8 +142,10 @@ export function MediaUpload({
       >
         {busy ? <Loader2 className="animate-spin" /> : <Upload />}
         {busy
-          ? `Uploading… ${Math.round(progress)}%`
-          : `Upload ${kind} from your computer`}
+          ? total > 1
+            ? `Uploading ${done + 1} of ${total}… ${Math.round(progress)}%`
+            : `Uploading… ${Math.round(progress)}%`
+          : `Upload ${kind}s from your computer`}
       </Button>
       {busy ? (
         <div

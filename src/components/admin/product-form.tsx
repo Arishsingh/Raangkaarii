@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Search, X } from "lucide-react";
+import { Check, Loader2, Search, Star, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -51,6 +51,69 @@ function Section({
   );
 }
 
+/**
+ * One set of media, newest arrangement first. The leading tile is the primary —
+ * the one a card shows — so it is labelled rather than left to be guessed at.
+ */
+function MediaRow({
+  title,
+  urls,
+  onRemove,
+  onPromote,
+  render,
+}: {
+  title: string;
+  urls: string[];
+  onRemove: (url: string) => void;
+  onPromote: (url: string) => void;
+  render: (url: string) => React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {urls.map((url, index) => (
+          <div key={url} className="relative">
+            <div className="relative h-44 w-36 overflow-hidden rounded-md border border-input bg-muted">
+              {render(url)}
+            </div>
+
+            {index === 0 ? (
+              <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[0.65rem] font-medium text-primary-foreground">
+                Main
+              </span>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="absolute left-1 top-1 bg-background/80"
+                onClick={() => onPromote(url)}
+              >
+                <Star className="size-3" />
+                Make main
+              </Button>
+            )}
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="absolute right-1 top-1 bg-background/80"
+              onClick={() => onRemove(url)}
+              aria-label="Remove this file"
+            >
+              <X />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ProductForm({
   options,
   editing,
@@ -61,9 +124,28 @@ export function ProductForm({
   const router = useRouter();
   const formRef = React.useRef<HTMLFormElement>(null);
   const [pending, startTransition] = React.useTransition();
-  const [image, setImage] = React.useState(editing?.image ?? "");
-  const [video, setVideo] = React.useState(editing?.video ?? "");
+  /**
+   * A product carries as many stills and clips as the admin adds. The first of
+   * each is the primary — it is what the cards, the cart and past orders show —
+   * so the order matters and can be changed here.
+   */
+  const [images, setImages] = React.useState<string[]>(editing?.images ?? []);
+  const [videos, setVideos] = React.useState<string[]>(editing?.videos ?? []);
   const [filter, setFilter] = React.useState("");
+
+  // Uploading the same file twice should not list it twice.
+  const addTo =
+    (set: React.Dispatch<React.SetStateAction<string[]>>) => (url: string) =>
+      set((current) => (current.includes(url) ? current : [...current, url]));
+
+  const removeFrom =
+    (set: React.Dispatch<React.SetStateAction<string[]>>) => (url: string) =>
+      set((current) => current.filter((entry) => entry !== url));
+
+  /** Moves one entry to the front, making it the primary of its set. */
+  const promoteIn =
+    (set: React.Dispatch<React.SetStateAction<string[]>>) => (url: string) =>
+      set((current) => [url, ...current.filter((entry) => entry !== url)]);
 
   const submit = (formData: FormData) => {
     startTransition(async () => {
@@ -77,8 +159,8 @@ export function ProductForm({
         router.push("/admin");
       } else {
         formRef.current?.reset();
-        setImage("");
-        setVideo("");
+        setImages([]);
+        setVideos([]);
       }
       router.refresh();
     });
@@ -97,83 +179,82 @@ export function ProductForm({
       {editing ? <input type="hidden" name="editingId" value={editing.id} /> : null}
 
       <Section
-        title="Image or video"
-        description="Upload a photo, a video, or both — whichever you add is what customers see."
+        title="Photos and videos"
+        description="Add as many as you like. The first of each is what shows on the product card — use “Make main” to change it."
       >
         <div className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-2">
-            <MediaUpload kind="image" onUploaded={setImage} />
-            <MediaUpload kind="video" onUploaded={setVideo} />
+            <MediaUpload kind="image" onUploaded={addTo(setImages)} />
+            <MediaUpload kind="video" onUploaded={addTo(setVideos)} />
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {options.images.map((source) => (
-              <button
-                key={source}
-                type="button"
-                onClick={() => setImage(image === source ? "" : source)}
-                aria-pressed={image === source}
-                className={cn(
-                  "relative size-16 overflow-hidden rounded-md border-2 transition",
-                  image === source
-                    ? "border-primary"
-                    : "border-transparent hover:border-input",
-                )}
-              >
-                <Image src={source} alt="" fill sizes="64px" unoptimized className="object-cover" />
-                {image === source ? (
-                  <span className="absolute inset-0 grid place-items-center bg-black/35">
-                    <Check className="size-4 text-white" />
-                  </span>
-                ) : null}
-              </button>
-            ))}
+            {options.images.map((source) => {
+              const chosen = images.includes(source);
+              return (
+                <button
+                  key={source}
+                  type="button"
+                  onClick={() =>
+                    chosen
+                      ? removeFrom(setImages)(source)
+                      : addTo(setImages)(source)
+                  }
+                  aria-pressed={chosen}
+                  className={cn(
+                    "relative size-16 overflow-hidden rounded-md border-2 transition",
+                    chosen ? "border-primary" : "border-transparent hover:border-input",
+                  )}
+                >
+                  <Image src={source} alt="" fill sizes="64px" unoptimized className="object-cover" />
+                  {chosen ? (
+                    <span className="absolute inset-0 grid place-items-center bg-black/35">
+                      <Check className="size-4 text-white" />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Hidden: the URLs are set by the uploaders and the picker above. */}
-          <input type="hidden" name="image" value={image} />
-          <input type="hidden" name="video" value={video} />
+          {/* Hidden: one per URL, so the action receives the set in order. */}
+          {images.map((url) => (
+            <input key={url} type="hidden" name="images" value={url} />
+          ))}
+          {videos.map((url) => (
+            <input key={url} type="hidden" name="videos" value={url} />
+          ))}
 
-          <div className="flex flex-wrap gap-4">
-            {image ? (
-              <div className="relative">
-                <div className="relative h-44 w-36 overflow-hidden rounded-md border border-input bg-muted">
-                  <Image src={image} alt="" fill sizes="144px" unoptimized className="object-cover" />
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="absolute right-1 top-1 bg-background/80"
-                  onClick={() => setImage("")}
-                >
-                  <X />
-                  Remove
-                </Button>
-              </div>
-            ) : null}
-            {video ? (
-              <div className="relative">
+          {images.length > 0 ? (
+            <MediaRow
+              title={`Photos (${images.length})`}
+              urls={images}
+              onRemove={removeFrom(setImages)}
+              onPromote={promoteIn(setImages)}
+              render={(url) => (
+                <Image src={url} alt="" fill sizes="144px" unoptimized className="object-cover" />
+              )}
+            />
+          ) : null}
+
+          {videos.length > 0 ? (
+            <MediaRow
+              title={`Videos (${videos.length})`}
+              urls={videos}
+              onRemove={removeFrom(setVideos)}
+              onPromote={promoteIn(setVideos)}
+              render={(url) => (
                 <video
-                  key={video}
-                  src={video}
+                  key={url}
+                  src={url}
                   controls
                   playsInline
-                  className="h-44 w-64 rounded-md border border-input bg-black object-contain"
+                  preload="metadata"
+                  className="h-full w-full bg-black object-contain"
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="absolute right-1 top-1 bg-background/80"
-                  onClick={() => setVideo("")}
-                >
-                  <X />
-                  Remove
-                </Button>
-              </div>
-            ) : null}
-          </div>
+              )}
+            />
+          ) : null}
         </div>
       </Section>
 

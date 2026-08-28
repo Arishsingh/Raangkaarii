@@ -84,8 +84,15 @@ export async function saveProduct(
     };
   }
 
-  const image = String(formData.get("image") ?? "").trim();
-  const video = String(formData.get("video") ?? "").trim();
+  /**
+   * A product can carry several stills and several clips. The first of each is
+   * kept in the singular column too, because cards, cart lines and past orders
+   * all read that — the gallery is additive, not a replacement.
+   */
+  const images = formData.getAll("images").map(String).map((entry) => entry.trim()).filter(Boolean);
+  const videos = formData.getAll("videos").map(String).map((entry) => entry.trim()).filter(Boolean);
+  const image = images[0] ?? "";
+  const video = videos[0] ?? "";
   if (!image && !video) {
     return { ok: false, message: "Add a photo or a video for this product." };
   }
@@ -111,6 +118,8 @@ export async function saveProduct(
     compareAt: compareAt === null ? null : Math.round(compareAt),
     image,
     video,
+    images,
+    videos,
     alt: String(formData.get("alt") ?? "").trim() || name,
     category,
     collections,

@@ -18,6 +18,9 @@ export type Product = {
   image: string;
   /** Optional clip, shown above the stills on the product page. */
   video?: string;
+  /** The full gallery, when a product carries more than the primary media. */
+  images?: string[];
+  videos?: string[];
   alt: string;
 };
 

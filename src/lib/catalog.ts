@@ -67,6 +67,8 @@ function toShopProduct(entry: AdminProduct): ShopProduct {
     inStock: entry.inStock,
     image: entry.image,
     video: entry.video || undefined,
+    images: entry.images,
+    videos: entry.videos,
     alt: entry.alt || entry.name,
   };
 }
@@ -81,6 +83,8 @@ function toCollectionProduct(entry: AdminProduct): CollectionProduct {
     rating: entry.rating,
     image: entry.image,
     video: entry.video || undefined,
+    images: entry.images,
+    videos: entry.videos,
     alt: entry.alt || entry.name,
     badges: entry.badges,
     style: entry.style,

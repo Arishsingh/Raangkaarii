@@ -6,6 +6,9 @@ export type Product = {
   rating: number;
   image: string;
   video?: string;
+  /** The full gallery, when a product carries more than the primary media. */
+  images?: string[];
+  videos?: string[];
   alt: string;
   badges: string[];
   style: string;
