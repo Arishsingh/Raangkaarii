@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Heart, Star } from "lucide-react";
+import { ArrowLeft, Heart, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ProductMedia } from "@/components/product-media";
@@ -14,7 +14,9 @@ import { useWishlist } from "@/components/wishlist-provider";
 import type { Product } from "@/lib/products";
 import {
   averageRating,
+  loadRemovedReviewIds,
   loadReviews,
+  removeReview,
   saveReviews,
   seedReviews,
   type Review,
@@ -43,7 +45,14 @@ function Stars({ value, className }: { value: number; className?: string }) {
   );
 }
 
-export function ProductDetail({ product }: { product: Product }) {
+export function ProductDetail({
+  product,
+  canModerate = false,
+}: {
+  product: Product;
+  /** Only an admin may take a customer's review down. */
+  canModerate?: boolean;
+}) {
   const wishlist = useWishlist();
   const cart = useCart();
   const saved = wishlist?.has(product.id) ?? false;
@@ -54,13 +63,23 @@ export function ProductDetail({ product }: { product: Product }) {
   const [author, setAuthor] = React.useState("");
   const [body, setBody] = React.useState("");
 
-  // Seeded reviews plus anything written on this device.
+  // Seeded reviews plus anything written on this device, minus anything deleted.
   React.useEffect(() => {
     const stored = loadReviews();
+    const removed = new Set(loadRemovedReviewIds());
     setReviews(
-      [...seedReviews, ...stored].filter((r) => r.productId === product.id),
+      [...seedReviews, ...stored].filter(
+        (r) => r.productId === product.id && !removed.has(r.id),
+      ),
     );
   }, [product.id]);
+
+  const deleteReview = (review: Review) => {
+    if (!window.confirm(`Delete this review from ${review.author}?`)) return;
+    removeReview(review.id);
+    setReviews((current) => current.filter((item) => item.id !== review.id));
+    toast.success("Review deleted.");
+  };
 
   const average = averageRating(reviews);
 
@@ -225,19 +244,31 @@ export function ProductDetail({ product }: { product: Product }) {
                     <div className="p-5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-medium">{review.author}</p>
-                        <time
-                          dateTime={new Date(review.createdAt).toISOString()}
-                          className="text-xs font-light text-foreground/50"
-                        >
-                          {new Date(review.createdAt).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )}
-                        </time>
+                        <div className="flex items-center gap-3">
+                          <time
+                            dateTime={new Date(review.createdAt).toISOString()}
+                            className="text-xs font-light text-foreground/50"
+                          >
+                            {new Date(review.createdAt).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
+                          </time>
+                          {canModerate ? (
+                            <button
+                              type="button"
+                              onClick={() => deleteReview(review)}
+                              aria-label={`Delete the review from ${review.author}`}
+                              className="text-foreground/40 transition-colors hover:text-destructive"
+                            >
+                              <Trash2 className="size-4" strokeWidth={1.5} />
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       <Stars value={review.rating} className="mt-2" />
                       <p className="mt-3 text-sm font-light leading-relaxed text-foreground/75">

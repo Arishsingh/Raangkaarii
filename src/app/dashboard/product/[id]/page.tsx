@@ -6,6 +6,7 @@ import { CartProvider } from "@/components/cart-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { WishlistProvider } from "@/components/wishlist-provider";
+import { isAdmin } from "@/lib/admin";
 import { getShopProduct } from "@/lib/catalog";
 import { products } from "@/lib/products";
 
@@ -31,12 +32,15 @@ export default async function ProductPage({
   const product = await getShopProduct(id);
   if (!product) notFound();
 
+  // Checked server-side: the admin list never reaches the browser.
+  const canModerate = await isAdmin();
+
   return (
     <WishlistProvider>
       <CartProvider>
       <SiteHeader solid locked />
       <main className="flex-1">
-        <ProductDetail product={product} />
+        <ProductDetail product={product} canModerate={canModerate} />
       </main>
       <SiteFooter locked />
       </CartProvider>

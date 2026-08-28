@@ -8,6 +8,11 @@ export type Review = {
 };
 
 const STORAGE_KEY = "rangkaarii:reviews";
+/**
+ * Seeded reviews ship in this file, so they cannot be deleted outright. Record
+ * the ids that were removed and filter them out on read instead.
+ */
+const REMOVED_KEY = "rangkaarii:reviews:removed";
 
 /** Shipped with the catalogue so a new piece is never a blank page. */
 export const seedReviews: Review[] = [
@@ -53,6 +58,29 @@ export function saveReviews(reviews: Review[]) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
   } catch {
     // Storage unavailable — the review still shows for this session.
+  }
+}
+
+export function loadRemovedReviewIds(): string[] {
+  try {
+    const saved = window.localStorage.getItem(REMOVED_KEY);
+    return saved ? (JSON.parse(saved) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Drops a review, whether it was written here or shipped with the catalogue. */
+export function removeReview(id: string) {
+  try {
+    const written = loadReviews().filter((review) => review.id !== id);
+    saveReviews(written);
+
+    const removed = new Set(loadRemovedReviewIds());
+    removed.add(id);
+    window.localStorage.setItem(REMOVED_KEY, JSON.stringify([...removed]));
+  } catch {
+    // Storage unavailable — the caller still drops it from the page.
   }
 }
 
