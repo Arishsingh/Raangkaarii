@@ -6,6 +6,7 @@ import { currentUser } from "@clerk/nextjs/server";
 const DEFAULT_ADMIN_EMAILS = [
   "arishsingh9469@gmail.com",
   "mohitsalgotra@gmail.com",
+  "23anuragsharma@gmail.com",
 ];
 
 /**
