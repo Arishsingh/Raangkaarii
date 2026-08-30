@@ -12,6 +12,7 @@ import {
   type ProductInput,
 } from "@/lib/catalog-store";
 import { slugify } from "@/lib/collections";
+import { updateOrderStatus, type OrderStatus } from "@/lib/orders-store";
 import { getProduct as getBuiltInProduct } from "@/lib/products";
 
 export type ActionState = { ok: boolean; message: string };
@@ -204,5 +205,36 @@ export async function removeBuiltInProduct(
   } catch (caught) {
     console.error("Could not hide built-in product", caught);
     return { ok: false, message: "Could not remove the product." };
+  }
+}
+
+export async function updateOrderStatusAction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await assertAdmin();
+  } catch {
+    return { ok: false, message: "Not authorised." };
+  }
+
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim() as OrderStatus;
+
+  if (!orderId || !status) {
+    return { ok: false, message: "Missing order ID or status." };
+  }
+
+  try {
+    await updateOrderStatus(orderId, status);
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin/revenue");
+    revalidatePath("/admin");
+    revalidatePath("/dashboard/orders");
+    revalidatePath(`/dashboard/orders/${orderId}`);
+    return { ok: true, message: `Order ${orderId} updated to ${status}.` };
+  } catch (caught) {
+    console.error("Could not update order status", caught);
+    return { ok: false, message: "Could not update order status." };
   }
 }

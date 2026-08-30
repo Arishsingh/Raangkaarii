@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       orderId: order.id,
       address: order.address,
       codAmount: order.payable,
-      paymentMode: order.status === "cod" ? "COD" : "Prepaid",
+      paymentMode: order.payment === "Cash on Delivery" ? "COD" : "Prepaid",
       description: order.lines.map((line) => line.name).join(", ").slice(0, 250),
       quantity: order.items,
     });

@@ -22,12 +22,24 @@ export type StoredOrderLine = {
 };
 
 /**
- * pending — a Razorpay order exists but no money has been captured yet.
- * paid    — Razorpay confirmed capture (webhook, or the verified browser call).
- * cod     — placed as cash on delivery; collected on handover, not by us.
- * failed  — Razorpay reported the payment failed.
+ * pending   — Awaiting admin activation / approval (Default for new orders).
+ * active    — Admin approved / activated and processing.
+ * shipped   — Courier shipment booked or marked shipped.
+ * delivered — Delivered to customer.
+ * cancelled — Cancelled by admin.
+ * paid      — Payment confirmed online via Razorpay.
+ * cod       — Cash on delivery order.
+ * failed    — Payment failed.
  */
-export type OrderStatus = "pending" | "paid" | "cod" | "failed";
+export type OrderStatus =
+  | "pending"
+  | "active"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "paid"
+  | "cod"
+  | "failed";
 
 export type StoredOrder = {
   id: string;
@@ -245,16 +257,16 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
      */
     const [totals] = (await sql`
       select
-        coalesce(sum(payable) filter (where status in ('paid','cod')), 0)::int as total,
-        count(*) filter (where status in ('paid','cod'))::int                  as order_count,
+        coalesce(sum(payable) filter (where status in ('paid','cod','active','shipped','delivered')), 0)::int as total,
+        count(*) filter (where status in ('paid','cod','active','shipped','delivered'))::int                  as order_count,
         count(*) filter (where status = 'pending')::int                        as pending_count,
         coalesce(sum(payable) filter (
-          where status in ('paid','cod')
+          where status in ('paid','cod','active','shipped','delivered')
             and placed_at >= date_trunc('month', now())), 0)::int              as this_month,
         coalesce(sum(payable) filter (
-          where status in ('paid','cod')
+          where status in ('paid','cod','active','shipped','delivered')
             and placed_at >= now() - interval '30 days'), 0)::int              as last30,
-        count(*) filter (where status = 'paid')::int                           as paid_count
+        count(*) filter (where status in ('paid','active','shipped','delivered'))::int                        as paid_count
       from orders
     `) as {
       total: number;
@@ -281,14 +293,14 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
       ) as day
       left join orders o
         on date_trunc('day', o.placed_at) = day
-       and o.status in ('paid','cod')
+       and o.status in ('paid','cod','active','shipped','delivered')
       group by day
       order by day
     `) as { date: string; total: number; orders: number }[];
 
     const recent = (await sql`
       select * from orders
-       where status in ('paid','cod')
+       where status not in ('failed')
        order by placed_at desc limit 12
     `) as OrderRow[];
 
@@ -313,11 +325,54 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
   }
 }
 
-/** Records the courier waybill once a shipment has been booked. */
+/** Fetches all orders for the admin orders view. */
+export async function listAllOrders(): Promise<StoredOrder[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    await ensureOrdersSchema();
+    const sql = getSql();
+    const rows = (await sql`
+      select * from orders order by placed_at desc
+    `) as OrderRow[];
+    return rows.map(toOrder);
+  } catch (caught) {
+    console.error("Could not list orders", caught);
+    return [];
+  }
+}
+
+/** Fetches Razorpay specific transaction orders for the admin Razorpay dashboard. */
+export async function listRazorpayTransactions(): Promise<StoredOrder[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    await ensureOrdersSchema();
+    const sql = getSql();
+    const rows = (await sql`
+      select * from orders
+       where razorpay_order_id is not null or payment = 'Razorpay'
+       order by placed_at desc
+    `) as OrderRow[];
+    return rows.map(toOrder);
+  } catch (caught) {
+    console.error("Could not list Razorpay transactions", caught);
+    return [];
+  }
+}
+
+/** Admin action to update order lifecycle status (e.g. pending -> active -> shipped -> delivered). */
+export async function updateOrderStatus(orderId: string, status: OrderStatus) {
+  await ensureOrdersSchema();
+  const sql = getSql();
+  await sql`
+    update orders set status = ${status} where id = ${orderId}
+  `;
+}
+
+/** Records the courier waybill once a shipment has been booked and marks as shipped. */
 export async function setOrderWaybill(orderId: string, waybill: string) {
   await ensureOrdersSchema();
   const sql = getSql();
-  await sql`update orders set waybill = ${waybill} where id = ${orderId}`;
+  await sql`update orders set waybill = ${waybill}, status = 'shipped' where id = ${orderId}`;
 }
 
 export async function getOrder(orderId: string): Promise<StoredOrder | null> {

@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       payment: "Cash on Delivery",
       paymentId: null,
       razorpayOrderId: null,
-      status: "cod",
+      status: "pending",
       items: cart.items,
       subtotal: cart.subtotal,
       delivery: cart.delivery,

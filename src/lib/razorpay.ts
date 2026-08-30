@@ -50,3 +50,32 @@ export function webhookSignatureValid(rawBody: string, signature: string) {
 export function webhooksConfigured() {
   return Boolean(process.env.RAZORPAY_WEBHOOK_SECRET);
 }
+
+export type RazorpayConfigStatus = {
+  isConfigured: boolean;
+  keyId: string | null;
+  maskedKeyId: string | null;
+  isTestMode: boolean;
+  isLiveMode: boolean;
+  hasKeySecret: boolean;
+  hasWebhookSecret: boolean;
+};
+
+export function getRazorpayConfigStatus(): RazorpayConfigStatus {
+  const keyId = process.env.RAZORPAY_KEY_ID?.trim() ?? "";
+  const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() ?? "";
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim() ?? "";
+
+  const isTestMode = keyId.startsWith("rzp_test_");
+  const isLiveMode = keyId.startsWith("rzp_live_");
+
+  return {
+    isConfigured: Boolean(keyId && keySecret),
+    keyId: keyId || null,
+    maskedKeyId: keyId ? `${keyId.slice(0, 12)}...` : null,
+    isTestMode,
+    isLiveMode,
+    hasKeySecret: Boolean(keySecret),
+    hasWebhookSecret: Boolean(webhookSecret),
+  };
+}

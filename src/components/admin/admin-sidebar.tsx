@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Boxes,
+  CreditCard,
   Home,
   IndianRupee,
   Menu,
   PackagePlus,
+  ShoppingBag,
   Store,
   Users,
   type LucideIcon,
@@ -31,6 +33,8 @@ const GROUPS: { label: string; items: Item[] }[] = [
     items: [
       { href: "/admin", label: "Add product", icon: PackagePlus, exact: true },
       { href: "/admin/products", label: "Products on site", icon: Boxes },
+      { href: "/admin/orders", label: "Orders on site", icon: ShoppingBag },
+      { href: "/admin/razorpay", label: "Razorpay Payments", icon: CreditCard },
       { href: "/admin/users", label: "Users on site", icon: Users },
       { href: "/admin/revenue", label: "Revenue", icon: IndianRupee },
     ],
