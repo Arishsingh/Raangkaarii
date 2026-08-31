@@ -1,9 +1,11 @@
 import Link from "next/link";
 
+import { AdminOverview } from "@/components/admin/admin-overview";
 import { ProductForm, type FormOptions } from "@/components/admin/product-form";
 import { listAdminProducts } from "@/lib/catalog-store";
 import { collectionHeadings } from "@/lib/collections";
 import { isDatabaseConfigured } from "@/lib/db";
+import { getRevenueStats } from "@/lib/orders-store";
 import { categories, fabrics, sizeChoices } from "@/lib/products";
 
 export const metadata = { title: "Add product — Admin" };
@@ -16,7 +18,11 @@ export default async function AdminProductsPage({
   const { edit } = await searchParams;
   const editingId = typeof edit === "string" ? edit : undefined;
 
-  const added = await listAdminProducts();
+  // Independent reads, so they overlap rather than queue.
+  const [added, stats] = await Promise.all([
+    listAdminProducts(),
+    getRevenueStats(),
+  ]);
   const editing = editingId
     ? (added.find((entry) => entry.id === editingId) ?? null)
     : null;
@@ -45,6 +51,10 @@ export default async function AdminProductsPage({
           restart the dev server.
         </p>
       ) : null}
+
+      {/* Editing one product is a focused task; the dashboard would only
+          get in the way, so it stands down until the edit is finished. */}
+      {editing ? null : <AdminOverview stats={stats} />}
 
       <section>
         <h2 className="font-heading text-2xl font-light">

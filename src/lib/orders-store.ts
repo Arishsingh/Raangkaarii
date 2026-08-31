@@ -182,6 +182,8 @@ export type RevenueStats = {
   averageOrder: number;
   paidShare: number;
   pendingCount: number;
+  shippedCount: number;
+  failedCount: number;
   daily: { date: string; total: number; orders: number }[];
   recent: StoredOrder[];
   error: string | null;
@@ -195,6 +197,8 @@ const EMPTY: RevenueStats = {
   averageOrder: 0,
   paidShare: 0,
   pendingCount: 0,
+  shippedCount: 0,
+  failedCount: 0,
   daily: [],
   recent: [],
   error: null,
@@ -266,7 +270,9 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
         coalesce(sum(payable) filter (
           where status in ('paid','cod','active','shipped','delivered')
             and placed_at >= now() - interval '30 days'), 0)::int              as last30,
-        count(*) filter (where status in ('paid','active','shipped','delivered'))::int                        as paid_count
+        count(*) filter (where status in ('paid','active','shipped','delivered'))::int                        as paid_count,
+        count(*) filter (where status = 'shipped')::int                        as shipped_count,
+        count(*) filter (where status = 'failed')::int                         as failed_count
       from orders
     `) as {
       total: number;
@@ -275,6 +281,8 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
       this_month: number;
       last30: number;
       paid_count: number;
+      shipped_count: number;
+      failed_count: number;
     }[];
 
     /**
@@ -315,6 +323,8 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
         ? Math.round(((totals?.paid_count ?? 0) / orderCount) * 100)
         : 0,
       pendingCount: totals?.pending_count ?? 0,
+      shippedCount: totals?.shipped_count ?? 0,
+      failedCount: totals?.failed_count ?? 0,
       daily,
       recent: recent.map(toOrder),
       error: null,
@@ -325,14 +335,24 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
   }
 }
 
-/** Fetches all orders for the admin orders view. */
+/**
+ * Fetches orders for the admin orders view, newest first.
+ *
+ * Bounded: the page filters and searches in the browser, so an unbounded read
+ * would ship every order ever placed to the client on each visit and grow
+ * without limit. Raise the ceiling here if the panel ever needs paging.
+ */
+const ADMIN_ORDER_LIMIT = 500;
+
 export async function listAllOrders(): Promise<StoredOrder[]> {
   if (!isDatabaseConfigured()) return [];
   try {
     await ensureOrdersSchema();
     const sql = getSql();
     const rows = (await sql`
-      select * from orders order by placed_at desc
+      select * from orders
+       order by placed_at desc
+       limit ${ADMIN_ORDER_LIMIT}
     `) as OrderRow[];
     return rows.map(toOrder);
   } catch (caught) {
@@ -351,6 +371,7 @@ export async function listRazorpayTransactions(): Promise<StoredOrder[]> {
       select * from orders
        where razorpay_order_id is not null or payment = 'Razorpay'
        order by placed_at desc
+       limit ${ADMIN_ORDER_LIMIT}
     `) as OrderRow[];
     return rows.map(toOrder);
   } catch (caught) {
