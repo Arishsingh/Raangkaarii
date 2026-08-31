@@ -20,24 +20,12 @@ import { toast } from "sonner";
 import { StatCard } from "@/components/admin/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDateTime, rupees } from "@/lib/format";
 import type { StoredOrder } from "@/lib/orders-store";
 import type { RazorpayConfigStatus } from "@/lib/razorpay";
 
-const rupees = (value: number) => `₹${value.toLocaleString("en-IN")}`;
-
-function formatDateTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
+/** The origin never changes for the life of the page, so nothing to subscribe to. */
+const subscribeToNothing = () => () => {};
 
 export function RazorpayDashboard({
   status,
@@ -47,13 +35,18 @@ export function RazorpayDashboard({
   transactions: StoredOrder[];
 }) {
   const [query, setQuery] = React.useState("");
-  const [origin, setOrigin] = React.useState("");
 
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
-    }
-  }, []);
+  /**
+   * The origin is only knowable in the browser. Reading it through
+   * useSyncExternalStore gives the server an empty snapshot and the client the
+   * real value in the same render — where a setState-in-effect forced a second,
+   * cascading render and briefly showed the wrong webhook URL.
+   */
+  const origin = React.useSyncExternalStore(
+    subscribeToNothing,
+    () => window.location.origin,
+    () => "",
+  );
 
   const webhookUrl = origin ? `${origin}/api/razorpay/webhook` : "/api/razorpay/webhook";
 
@@ -75,20 +68,23 @@ export function RazorpayDashboard({
     );
   }, [transactions, query]);
 
+  // One pass: the three tallies and the revenue sum all come off the same loop.
   const metrics = React.useMemo(() => {
-    const paidTxs = transactions.filter(
-      (tx) => tx.status === "paid" || (tx.paymentId && tx.status !== "failed"),
-    );
-    const totalRevenue = paidTxs.reduce((sum, tx) => sum + tx.payable, 0);
-    const pendingCount = transactions.filter((tx) => tx.status === "pending").length;
-    const failedCount = transactions.filter((tx) => tx.status === "failed").length;
+    let totalRevenue = 0;
+    let paidCount = 0;
+    let pendingCount = 0;
+    let failedCount = 0;
 
-    return {
-      totalRevenue,
-      paidCount: paidTxs.length,
-      pendingCount,
-      failedCount,
-    };
+    for (const tx of transactions) {
+      if (tx.status === "paid" || (tx.paymentId && tx.status !== "failed")) {
+        totalRevenue += tx.payable;
+        paidCount += 1;
+      }
+      if (tx.status === "pending") pendingCount += 1;
+      if (tx.status === "failed") failedCount += 1;
+    }
+
+    return { totalRevenue, paidCount, pendingCount, failedCount };
   }, [transactions]);
 
   return (

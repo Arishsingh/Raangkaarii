@@ -3,8 +3,6 @@
 import * as React from "react";
 import {
   CheckCircle2,
-  Clock,
-  Filter,
   Loader2,
   MapPin,
   PackageCheck,
@@ -12,87 +10,33 @@ import {
   Phone,
   Search,
   ShoppingBag,
-  Truck,
   User,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateOrderStatusAction } from "@/app/admin/actions";
 import { ShipButton } from "@/components/admin/ship-button";
+import { StatusBadge } from "@/components/admin/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDateTime, rupees } from "@/lib/format";
 import type { OrderStatus, StoredOrder } from "@/lib/orders-store";
 
-const rupees = (value: number) => `₹${value.toLocaleString("en-IN")}`;
-
-function formatDateTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function StatusBadge({ status }: { status: OrderStatus }) {
-  switch (status) {
-    case "pending":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-          <Clock className="size-3.5" /> Pending Activation
-        </span>
-      );
-    case "active":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-          <PackageCheck className="size-3.5" /> Active / Approved
-        </span>
-      );
-    case "shipped":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-600 dark:text-purple-400">
-          <Truck className="size-3.5" /> Shipped
-        </span>
-      );
-    case "delivered":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-          <CheckCircle2 className="size-3.5" /> Delivered
-        </span>
-      );
-    case "cancelled":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-          <PackageX className="size-3.5" /> Cancelled
-        </span>
-      );
-    case "paid":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-          <CheckCircle2 className="size-3.5" /> Paid Online
-        </span>
-      );
-    case "cod":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-          <Clock className="size-3.5" /> Cash on Delivery
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-muted bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-          {status}
-        </span>
-      );
-  }
-}
-
 type Tab = "all" | "pending" | "active" | "shipped" | "delivered" | "cancelled";
+
+/**
+ * Which order statuses each tab covers. The filter and the badge counts read
+ * this same map, so a tab can never show a count it would not then list.
+ */
+const TAB_STATUSES: Record<Exclude<Tab, "all">, readonly OrderStatus[]> = {
+  pending: ["pending", "cod"],
+  active: ["active", "paid"],
+  shipped: ["shipped"],
+  delivered: ["delivered"],
+  cancelled: ["cancelled"],
+};
+
+const COUNTED_TABS = Object.keys(TAB_STATUSES) as Exclude<Tab, "all">[];
 
 export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder[] }) {
   const [activeTab, setActiveTab] = React.useState<Tab>("all");
@@ -120,41 +64,41 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
   };
 
   const filteredOrders = React.useMemo(() => {
-    return initialOrders.filter((order) => {
-      // Tab filter logic
-      if (activeTab === "pending" && order.status !== "pending" && order.status !== "cod") {
-        return false;
-      }
-      if (activeTab === "active" && order.status !== "active" && order.status !== "paid") {
-        return false;
-      }
-      if (activeTab === "shipped" && order.status !== "shipped") return false;
-      if (activeTab === "delivered" && order.status !== "delivered") return false;
-      if (activeTab === "cancelled" && order.status !== "cancelled") return false;
+    // Normalised once, not once per order.
+    const q = query.trim().toLowerCase();
 
-      // Query filter logic
-      if (!query.trim()) return true;
-      const q = query.toLowerCase().trim();
+    return initialOrders.filter((order) => {
+      if (activeTab !== "all" && !TAB_STATUSES[activeTab].includes(order.status)) {
+        return false;
+      }
+      if (!q) return true;
       return (
         order.id.toLowerCase().includes(q) ||
         order.name.toLowerCase().includes(q) ||
         order.email.toLowerCase().includes(q) ||
-        (order.address?.phone && order.address.phone.includes(q)) ||
-        (order.address?.pincode && order.address.pincode.includes(q)) ||
-        (order.address?.city && order.address.city.toLowerCase().includes(q))
+        Boolean(order.address?.phone?.includes(q)) ||
+        Boolean(order.address?.pincode?.includes(q)) ||
+        Boolean(order.address?.city?.toLowerCase().includes(q))
       );
     });
   }, [initialOrders, activeTab, query]);
 
+  // One pass over the orders rather than a separate filter() per tab.
   const counts = React.useMemo(() => {
-    return {
+    const tally: Record<Tab, number> = {
       all: initialOrders.length,
-      pending: initialOrders.filter((o) => o.status === "pending" || o.status === "cod").length,
-      active: initialOrders.filter((o) => o.status === "active" || o.status === "paid").length,
-      shipped: initialOrders.filter((o) => o.status === "shipped").length,
-      delivered: initialOrders.filter((o) => o.status === "delivered").length,
-      cancelled: initialOrders.filter((o) => o.status === "cancelled").length,
+      pending: 0,
+      active: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
     };
+    for (const order of initialOrders) {
+      for (const tab of COUNTED_TABS) {
+        if (TAB_STATUSES[tab].includes(order.status)) tally[tab] += 1;
+      }
+    }
+    return tally;
   }, [initialOrders]);
 
   return (

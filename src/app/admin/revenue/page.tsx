@@ -3,19 +3,21 @@ import { CreditCard, IndianRupee, Receipt, TrendingUp } from "lucide-react";
 import { RevenueChart } from "@/components/admin/revenue-chart";
 import { StatCard } from "@/components/admin/stat-card";
 import { ShipButton } from "@/components/admin/ship-button";
+import { rupees } from "@/lib/format";
 import { getRevenueStats } from "@/lib/orders-store";
 
 export const metadata = { title: "Revenue — Admin" };
 
-const rupees = (value: number) => `₹${value.toLocaleString("en-IN")}`;
+/** Deliberately year-less: this table only ever shows the recent window. */
+const shortDateTime = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-IN", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return shortDateTime.format(new Date(iso));
 }
 
 export default async function AdminRevenuePage() {
