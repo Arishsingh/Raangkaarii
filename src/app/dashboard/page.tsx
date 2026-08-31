@@ -4,6 +4,7 @@ import { currentUser } from "@clerk/nextjs/server";
 
 import { ShopBoard } from "@/components/shop-board";
 import { CartProvider } from "@/components/cart-provider";
+import { FloatingActions } from "@/components/floating-actions";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { WishlistProvider } from "@/components/wishlist-provider";
@@ -38,6 +39,7 @@ export default async function DashboardPage() {
         </Suspense>
       </main>
       <SiteFooter locked />
+      <FloatingActions />
       </CartProvider>
     </WishlistProvider>
   );

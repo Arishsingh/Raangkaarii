@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, Heart, Search, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Heart, Search, ShoppingBag, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -19,6 +19,13 @@ import {
 } from "@/lib/products";
 import type { FilterGroup } from "@/components/shop-filters";
 import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 const tabs = ["All", "New Arrivals", "Sale"];
@@ -41,9 +48,11 @@ export function ShopBoard({
   const [price, setPrice] = React.useState(maxPrice);
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState("All");
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const wishlist = useWishlist();
   const cart = useCart();
-  const loved = wishlist?.items ?? [];
+  // Stable identity: a fresh [] each render re-ran the product filter every time.
+  const loved = React.useMemo(() => wishlist?.items ?? [], [wishlist?.items]);
 
   const toggleFilter = (heading: string, option: string) => {
     setSelected((current) => {
@@ -56,6 +65,29 @@ export function ShopBoard({
       };
     });
   };
+
+  const activeCount =
+    Object.values(selected).reduce((total, chosen) => total + chosen.length, 0) +
+    (price < maxPrice ? 1 : 0);
+
+  const clearAll = () => {
+    setSelected({});
+    setPrice(maxPrice);
+  };
+
+  const filterPanel = (
+    <ShopFilters
+      groups={filterGroups}
+      selected={selected}
+      onToggle={toggleFilter}
+      onResetGroup={(heading) =>
+        setSelected((current) => ({ ...current, [heading]: [] }))
+      }
+      price={price}
+      onPriceChange={setPrice}
+      maxPrice={maxPrice}
+    />
+  );
 
   const visible = React.useMemo(() => {
     return products.filter((product) => {
@@ -115,6 +147,53 @@ export function ShopBoard({
           />
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Below md the rail collapses into a drawer so it never
+              pushes the pieces off the first screen. */}
+          {lovedView ? null : (
+            <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-light transition-colors hover:bg-muted md:hidden"
+                >
+                  <SlidersHorizontal className="size-4" strokeWidth={1.5} />
+                  Filters
+                  {activeCount > 0 ? (
+                    <span className="flex size-5 items-center justify-center rounded-full bg-foreground text-[11px] font-medium text-background">
+                      {activeCount}
+                    </span>
+                  ) : null}
+                </button>
+              </SheetTrigger>
+              <SheetContent
+                side="left"
+                className="w-[85vw] gap-0 p-0 sm:max-w-sm"
+              >
+                <SheetHeader className="border-b px-5 py-4">
+                  <SheetTitle className="font-serif text-lg">Filters</SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto px-5 py-6">
+                  {filterPanel}
+                </div>
+                <div className="flex items-center gap-3 border-t px-5 py-4">
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="flex-1 rounded-full border py-2.5 text-sm font-light transition-colors hover:bg-muted"
+                  >
+                    Clear all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen(false)}
+                    className="flex-1 rounded-full bg-foreground py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-85"
+                  >
+                    Show {visible.length}
+                  </button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
           {tabs.map((item) => (
             <button
               key={item}
@@ -167,21 +246,27 @@ export function ShopBoard({
       <div
         className={cn(
           "mt-6 grid items-start gap-8",
-          lovedView ? "" : "lg:grid-cols-[210px_minmax(0,1fr)]",
+          lovedView
+            ? ""
+            : "md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[230px_minmax(0,1fr)]",
         )}
       >
         {lovedView ? null : (
-        <ShopFilters
-          groups={filterGroups}
-          selected={selected}
-          onToggle={toggleFilter}
-          onResetGroup={(heading) =>
-            setSelected((current) => ({ ...current, [heading]: [] }))
-          }
-          price={price}
-          onPriceChange={setPrice}
-          maxPrice={maxPrice}
-        />
+          <div className="hidden md:sticky md:top-6 md:block md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:pr-2 md:pb-2">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="font-serif text-lg">Filters</h3>
+              {activeCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-xs font-light text-foreground/55 transition-colors hover:text-foreground"
+                >
+                  Clear all
+                </button>
+              ) : null}
+            </div>
+            {filterPanel}
+          </div>
         )}
 
         {visible.length === 0 ? (
@@ -207,7 +292,9 @@ export function ShopBoard({
                       image={product.image}
                       video={product.video}
                       alt={product.alt}
-                      sizes="(min-width: 1280px) 380px, (min-width: 640px) 45vw, 90vw"
+                      // Accounts for the filter rail: cards are narrower than
+                      // the raw viewport fractions would suggest.
+                      sizes="(min-width: 1280px) 340px, (min-width: 768px) 30vw, (min-width: 640px) 45vw, 90vw"
                       compact
                     />
                   </Link>
