@@ -199,7 +199,6 @@ src/
 └─ proxy.ts          Clerk middleware
 ```
 
-## Deployment
 
 Deploys to Vercel. Add every variable above to the project's environment (`vercel env add`), then:
 
