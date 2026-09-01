@@ -34,11 +34,23 @@ export const FABRICS = ["Cotton", "Cotton Voile", "Cotton Gauze", "Satin", "Line
 export const COLOURS = ["Cream", "Green", "Rosewater", "Pale Blue", "Navy", "Crimson"];
 export const PRINTS = ["Floral", "Gingham", "Striped", "Animal", "Plain"];
 const IMAGES = [
-  { src: "/hero.webp", alt: "Model in printed cotton pyjamas" },
-  { src: "/hero-3.webp", alt: "Model in a printed cotton nightdress" },
-  { src: "/hero-4.webp", alt: "Model in a crimson embroidered set" },
-  { src: "/hero-5.webp", alt: "Model in a red velvet kurta set" },
-  { src: "/hero-2.webp", alt: "Model in an embroidered kurta" },
+  { src: "/products/01.webp", alt: "Rose pink kurta with floral thread embroidery" },
+  { src: "/products/02.webp", alt: "Teal bandhani print kurta with a gold zari placket" },
+  { src: "/products/03.webp", alt: "Mint green floral kurta with white lace trim" },
+  { src: "/products/04.webp", alt: "Crimson kurta with green and gold floral embroidery" },
+  { src: "/products/05.webp", alt: "Ivory kurta with black embroidery and a sheer panel" },
+  { src: "/products/06.webp", alt: "Ivory kurta with a red and black geometric yoke" },
+  { src: "/products/07.webp", alt: "Powder blue kurta with white chikankari lace panels" },
+  { src: "/products/08.webp", alt: "Lime green floral kurta with a matching dupatta" },
+  { src: "/products/09.webp", alt: "Blush paisley print kurta with a black embroidered panel" },
+  { src: "/products/10.webp", alt: "Lavender kurta with pink floral embroidery" },
+  { src: "/products/11.webp", alt: "Ivory kurta with black rose embroidery across the yoke" },
+  { src: "/products/12.webp", alt: "Pale blue kurta covered in white chikankari embroidery" },
+  { src: "/products/13.webp", alt: "Sage green kurta with a pearl-worked neckline" },
+  { src: "/products/14.webp", alt: "Mocha silk kurta with tonal thread embroidery" },
+  { src: "/products/15.webp", alt: "Deep red kurta with gold zari embroidery" },
+  { src: "/products/16.webp", alt: "Butter yellow lace kurta over a printed base" },
+  { src: "/products/17.webp", alt: "Rust red kurta with heavy gold and green embroidery" },
 ];
 
 /** Deterministic pseudo-random so server and client render the same catalogue. */

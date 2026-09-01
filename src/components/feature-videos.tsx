@@ -11,7 +11,7 @@ const features = [
     title: "Everyday Kurta Sets",
     description: "Thread work finished by hand, cut for the long way home",
     video: "/videos/kurta-sets.mp4",
-    poster: "/hero-2.webp",
+    poster: "/products/14.webp",
     href: "/collections/womens",
   },
   {
@@ -19,7 +19,7 @@ const features = [
     title: "Cotton Voile Layers",
     description: "Breathable cotton voile made for warm afternoons",
     video: "/videos/cotton-voile.mp4",
-    poster: "/hero-3.webp",
+    poster: "/products/15.webp",
     href: "/collections/cotton-voile",
   },
   {
@@ -27,7 +27,7 @@ const features = [
     title: "Velvet & Organza",
     description: "Gold thread and deep crimson, cut for evening light",
     video: "/videos/velvet-organza.mp4",
-    poster: "/hero-4.webp",
+    poster: "/products/16.webp",
     href: "/collections/satin",
   },
 ];

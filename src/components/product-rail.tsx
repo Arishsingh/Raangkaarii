@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Heart } from "lucide-react";
 
-import { slugify } from "@/lib/collections";
 import { cn } from "@/lib/utils";
 
 type Product = {
@@ -24,42 +23,42 @@ const tabs: { label: string; products: Product[] }[] = [
     label: "New In",
     products: [
       {
-        name: "Green Watercolour Gingham Seersucker Boxy Pyjama Set",
+        name: "Rose Pink Floral Hand-Embroidered Kurta",
         price: "£52.00",
-        image: "/hero.webp",
-        alt: "Green gingham seersucker boxy pyjama set",
+        image: "/products/01.webp",
+        alt: "Rose pink kurta with floral thread embroidery on the yoke",
         badge: "NEW",
         sizes: SIZES,
       },
       {
-        name: "Womens Green Watercolour Gingham Drop Shoulder Mini Nightdress",
+        name: "Teal Bandhani Zari Work Kurta Set",
         price: "£46.00",
-        image: "/hero-3.webp",
-        alt: "Green gingham drop shoulder mini nightdress",
+        image: "/products/02.webp",
+        alt: "Teal bandhani print kurta with gold zari placket",
         badge: "NEW",
         sizes: SIZES,
       },
       {
-        name: "Womens Rosewater Contrast Trim Gauze Frill Collar Pyjama Set",
+        name: "Mint Floral Lace Trim Kurta",
         price: "£48.00",
-        image: "/hero-4.webp",
-        alt: "Rosewater gauze frill collar pyjama set",
+        image: "/products/03.webp",
+        alt: "Mint green floral kurta with white lace trim",
         badge: "NEW",
         sizes: SIZES,
       },
       {
-        name: "Pale Blue Wisteria Cotton Voile Oversize Short Pyjama Set",
+        name: "Crimson Silk Embroidered Kurta",
         price: "£46.00",
-        image: "/hero-5.webp",
-        alt: "Pale blue wisteria cotton voile short pyjama set",
+        image: "/products/04.webp",
+        alt: "Crimson kurta with green and gold floral embroidery",
         badge: "NEW",
         sizes: SIZES,
       },
       {
-        name: "Ivory Embroidered Cotton Long Sleeve Nightdress",
+        name: "Ivory Sheer Panel Embroidered Kurta",
         price: "£54.00",
-        image: "/hero-2.webp",
-        alt: "Ivory embroidered cotton nightdress",
+        image: "/products/05.webp",
+        alt: "Ivory kurta with black embroidery and a sheer panel",
         badge: "NEW",
         sizes: SIZES,
       },
@@ -69,64 +68,64 @@ const tabs: { label: string; products: Product[] }[] = [
     label: "Best Sellers",
     products: [
       {
-        name: "Womens Rosewater Contrast Trim Gauze Frill Collar Pyjama Set",
+        name: "Ivory Geometric Yoke Kurta",
         price: "£48.00",
-        image: "/hero-4.webp",
-        alt: "Rosewater gauze frill collar pyjama set",
+        image: "/products/06.webp",
+        alt: "Ivory kurta with a red and black geometric embroidered yoke",
         sizes: SIZES,
       },
       {
-        name: "Green Watercolour Gingham Seersucker Boxy Pyjama Set",
+        name: "Powder Blue Chikankari Kurta",
         price: "£52.00",
-        image: "/hero.webp",
-        alt: "Green gingham seersucker boxy pyjama set",
+        image: "/products/07.webp",
+        alt: "Powder blue kurta with white chikankari lace panels",
         sizes: SIZES,
       },
       {
-        name: "Pale Blue Wisteria Cotton Voile Oversize Short Pyjama Set",
+        name: "Lime Floral Kurta with Dupatta",
         price: "£46.00",
-        image: "/hero-5.webp",
-        alt: "Pale blue wisteria cotton voile short pyjama set",
+        image: "/products/08.webp",
+        alt: "Lime green floral kurta with a matching dupatta",
         sizes: SIZES,
       },
       {
-        name: "Womens Green Watercolour Gingham Drop Shoulder Mini Nightdress",
+        name: "Blush Paisley Print Kurta",
         price: "£46.00",
-        image: "/hero-3.webp",
-        alt: "Green gingham drop shoulder mini nightdress",
+        image: "/products/09.webp",
+        alt: "Blush paisley print kurta with a black embroidered panel",
         sizes: SIZES,
       },
     ],
   },
   {
-    label: "Linen Blend Pyjamas & Nightwear",
+    label: "Linen Blend Kurtas & Sets",
     products: [
       {
-        name: "Ivory Embroidered Linen Blend Long Sleeve Nightdress",
+        name: "Lavender Floral Embroidered Kurta",
         price: "£54.00",
-        image: "/hero-2.webp",
-        alt: "Ivory embroidered linen blend nightdress",
+        image: "/products/10.webp",
+        alt: "Lavender kurta with pink floral embroidery and lace sleeves",
         sizes: SIZES,
       },
       {
-        name: "Sand Linen Blend Oversize Short Pyjama Set",
+        name: "Ivory Rose Embroidered Kurta",
         price: "£58.00",
-        image: "/hero-3.webp",
-        alt: "Sand linen blend short pyjama set",
+        image: "/products/11.webp",
+        alt: "Ivory kurta with black rose embroidery across the yoke",
         sizes: SIZES,
       },
       {
-        name: "Crimson Linen Blend Piped Pyjama Set",
+        name: "Pale Blue Heavy Chikankari Kurta",
         price: "£62.00",
-        image: "/hero-4.webp",
-        alt: "Crimson linen blend piped pyjama set",
+        image: "/products/12.webp",
+        alt: "Pale blue kurta covered in white chikankari embroidery",
         sizes: SIZES,
       },
       {
-        name: "Washed Blue Linen Blend Dressing Gown",
+        name: "Sage Pearl Neckline Kurta",
         price: "£68.00",
-        image: "/hero-5.webp",
-        alt: "Washed blue linen blend dressing gown",
+        image: "/products/13.webp",
+        alt: "Sage green kurta with a pearl-worked neckline",
         sizes: SIZES,
       },
     ],
@@ -208,11 +207,9 @@ export function ProductRail() {
           className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-5 pb-2 sm:-mx-8 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {tabs[active].products.map((product) => (
-            <ProductCard
-              key={product.name}
-              product={product}
-              href={`/collections/${slugify(tabs[active].label)}`}
-            />
+            // A product is only shoppable once signed in, so that is where a
+            // card leads; the header nav still reaches the collections.
+            <ProductCard key={product.name} product={product} href="/sign-in" />
           ))}
         </div>
       </div>
@@ -262,7 +259,10 @@ function ProductCard({ product, href }: { product: Product; href: string }) {
         </div>
 
         <h3 className="mt-4 font-serif text-base leading-snug">{product.name}</h3>
-        <p className="mt-1.5 text-sm font-light text-foreground/70">{product.price}</p>
+        {/* Signed-out visitors do not see prices anywhere on the public site. */}
+        <p className="mt-1.5 text-sm font-light text-foreground/60">
+          Sign in to view price
+        </p>
       </Link>
     </article>
   );

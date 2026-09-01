@@ -7,32 +7,32 @@ const cards = [
     headline: "Every motif has an origin.",
     description:
       "Each print and stitch is traced back to the region and workshop it came from, so you know the story behind the piece you wear.",
-    image: "/hero-2.webp",
-    alt: "Close detail of hand embroidery on a kurta",
+    image: "/products/01.webp",
+    alt: "Close detail of hand embroidery on a rose pink kurta",
   },
   {
     title: "Fit Guide",
     headline: "Find the cut that suits you.",
     description:
       "Measurements, drape notes, and model sizing for every silhouette — from traditional long sets to oversized separates.",
-    image: "/hero-3.webp",
-    alt: "Woman choosing a piece from a linen-filled wardrobe",
+    image: "/products/03.webp",
+    alt: "Mint floral kurta with a lace trim held up in the studio",
   },
   {
     title: "Fabric Notes",
     headline: "Know what you're wearing.",
     description:
       "Cotton voile, gauze, satin, and linen blend compared on weight, breathability, and how each one softens with wear.",
-    image: "/hero.webp",
-    alt: "Rails of curated clothing in a boutique",
+    image: "/products/13.webp",
+    alt: "Sage green kurta with a pearl-worked neckline",
   },
   {
     title: "Care & Repair",
     headline: "Made to last past the season.",
     description:
       "Washing guidance for hand-finished embroidery, plus a repair service for the pieces you are not ready to give up.",
-    image: "/hero-4.webp",
-    alt: "Model in a crimson embroidered set",
+    image: "/products/15.webp",
+    alt: "Deep red kurta with gold zari embroidery",
   },
 ];
 
