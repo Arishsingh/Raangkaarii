@@ -179,14 +179,18 @@ export function CollectionView({ collection }: { collection: Collection }) {
   );
 }
 
-function ProductCard({ product }: { product: Product }) {
-  const discount = product.compareAt
-    ? Math.round((1 - product.price / product.compareAt) * 100)
-    : 0;
+/** Shown in place of every price on the pages a signed-out visitor can reach. */
+const PRICE_PROMPT = "Sign in to view price";
 
+/** Where a signed-out visitor lands when they tap a product. */
+const SIGN_IN_HREF = "/sign-in";
+
+function ProductCard({ product }: { product: Product }) {
   return (
     <article>
-      <Link href="#" className="group block">
+      {/* Nothing about a piece — its price, its detail page, its cart — is
+          public, so the whole card is a way in to signing in. */}
+      <Link href={SIGN_IN_HREF} className="group block">
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           <ProductMedia
             image={product.image}
@@ -230,18 +234,9 @@ function ProductCard({ product }: { product: Product }) {
         <div className="mt-3 flex items-start justify-between gap-3">
           <div>
             <h3 className="font-serif text-base leading-snug">{product.name}</h3>
-            <p className="mt-2 flex flex-wrap items-center gap-2 text-sm font-light">
-              <span>₹{product.price.toLocaleString("en-IN")}</span>
-              {product.compareAt ? (
-                <>
-                  <span className="text-foreground/45 line-through">
-                    ₹{product.compareAt.toLocaleString("en-IN")}
-                  </span>
-                  <span className="bg-destructive px-1.5 py-0.5 text-[11px] text-white">
-                    {discount}% off
-                  </span>
-                </>
-              ) : null}
+            {/* Prices are for signed-in customers only; see PRICE_PROMPT. */}
+            <p className="mt-2 text-sm font-light text-foreground/60">
+              {PRICE_PROMPT}
             </p>
           </div>
           <span
