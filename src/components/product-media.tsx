@@ -1,5 +1,3 @@
-import Image from "next/image";
-import { ImageOff } from "lucide-react";
 
 /**
  * A product shows whichever media it was given: its own clip when there is one,
@@ -8,6 +6,7 @@ import { ImageOff } from "lucide-react";
  * every card once ended up showing the same house reel.
  */
 import { BannerVideo } from "@/components/banner-video";
+import { MediaFallback, ProductImage } from "@/components/product-image";
 
 export function ProductMedia({
   image,
@@ -42,20 +41,10 @@ export function ProductMedia({
 
   if (image) {
     return (
-      <Image
-        src={image}
-        alt={alt}
-        fill
-        sizes={sizes}
-        className={className ?? "object-cover"}
-      />
+      <ProductImage src={image} alt={alt} sizes={sizes} className={className} />
     );
   }
 
   // Neither was uploaded; show a neutral tile rather than a broken image.
-  return (
-    <div className="grid h-full w-full place-items-center bg-muted text-muted-foreground">
-      <ImageOff className="size-6" />
-    </div>
-  );
+  return <MediaFallback />;
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { ImageOff, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
+import { MediaFallback } from "@/components/product-image";
 import { useNearViewport } from "@/components/use-near-viewport";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,28 @@ export function BannerVideo({
    * should never be shown a decoder message.
    */
   const [failed, setFailed] = React.useState(false);
+  /**
+   * The still that could not be loaded, remembered by URL so a card reused for
+   * another product still gives the new poster its own chance.
+   */
+  const [badPoster, setBadPoster] = React.useState<string | null>(null);
+  const posterSrc = poster && poster !== badPoster ? poster : null;
+
+  /**
+   * A poster that cannot load leaves the card blank rather than broken: with
+   * `preload="none"` the clip is never fetched, so it never errors either and
+   * nothing ever replaces the empty frame. Probing the still off-screen tells
+   * us to stop trusting it, which in turn lets the clip load and report.
+   */
+  React.useEffect(() => {
+    if (!poster) return;
+    const probe = new window.Image();
+    probe.onerror = () => setBadPoster(poster);
+    probe.src = poster;
+    return () => {
+      probe.onerror = null;
+    };
+  }, [poster]);
 
   // While previewing, jump back to the start once past the preview window.
   const handleTimeUpdate = () => {
@@ -126,15 +149,22 @@ export function BannerVideo({
   };
 
   if (failed) {
-    return poster ? (
+    // The poster usually lives wherever the clip does, so whatever stopped one
+    // — a deleted upload, a blocked store — tends to stop the other. Without
+    // this second step the card ends up showing the browser's broken-image
+    // glyph and the product's alt text instead of the still.
+    return poster && posterSrc ? (
       // Plain <img>: the URL is whatever was uploaded, and a failed clip is not
       // worth routing through the image optimiser.
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={poster} alt={label ?? ""} className="h-full w-full object-cover" />
+      <img
+        src={posterSrc}
+        alt={label ?? ""}
+        className="h-full w-full object-cover"
+        onError={() => setBadPoster(poster ?? null)}
+      />
     ) : (
-      <div className="grid h-full w-full place-items-center bg-muted text-muted-foreground">
-        <ImageOff className="size-6" />
-      </div>
+      <MediaFallback />
     );
   }
 
@@ -148,7 +178,7 @@ export function BannerVideo({
       <video
         ref={videoRef}
         className="h-full w-full object-cover"
-        poster={poster}
+        poster={posterSrc ?? undefined}
         autoPlay={!hoverToPlay}
         muted={muted}
         // A preview repeats; the full clip is meant to run once and end.
@@ -162,7 +192,7 @@ export function BannerVideo({
          * none. Without a poster there is nothing else to show, so metadata
          * still has to come down for the first frame.
          */
-        preload={poster ? "none" : "metadata"}
+        preload={posterSrc ? "none" : "metadata"}
         aria-label={label}
         onTimeUpdate={handleTimeUpdate}
         onEnded={backToPreview}
