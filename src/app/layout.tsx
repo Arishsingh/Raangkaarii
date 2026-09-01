@@ -29,7 +29,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rangkaarii — Sleepwear & Everyday Classics",
+  title: "Rangkaarii — Branded Pakistani Suits",
   description:
     "New shapes, fresh prints, instant favourites. Womenswear, menswear, kids and home.",
 };
