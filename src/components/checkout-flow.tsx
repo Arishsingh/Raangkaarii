@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCart } from "@/components/cart-provider";
 import type { Product } from "@/lib/products";
+import { splitCartLines } from "@/lib/cart-lines";
 import {
   loadAddress,
   newOrderId,
@@ -62,13 +63,8 @@ export function CheckoutFlow({
 }) {
   const router = useRouter();
   const cart = useCart();
-  const lines = cart?.lines ?? [];
+  const savedLines = cart?.lines;
 
-  // Everything the admin panel has added, which the built-in list never saw.
-  const catalogue = React.useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
-  );
 
   const [step, setStep] = React.useState(0);
   const [address, setAddress] = React.useState<Address>(EMPTY);
@@ -93,12 +89,21 @@ export function CheckoutFlow({
     if (saved) setAddress(saved);
   }, []);
 
-  const rows = lines
-    .map((line) => ({ line, product: catalogue.get(line.id) ?? null }))
-    .filter((row) => row.product !== null);
+  // Everything the admin panel has added, which the built-in list never saw.
+  const { rows, missing } = React.useMemo(
+    () => splitCartLines(savedLines ?? [], products),
+    [savedLines, products],
+  );
+
+  /**
+   * Only what the catalogue still stocks is ever sent to the server. Posting
+   * the saved cart wholesale meant one delisted piece failed the whole order
+   * with "an item we no longer stock", and the shopper had no way to find it.
+   */
+  const orderLines = React.useMemo(() => rows.map(({ line }) => line), [rows]);
 
   const subtotal = rows.reduce(
-    (total, row) => total + row.product!.price * row.line.qty,
+    (total, row) => total + row.product.price * row.line.qty,
     0,
   );
   const itemCount = rows.reduce((total, row) => total + row.line.qty, 0);
@@ -161,8 +166,8 @@ export function CheckoutFlow({
        */
       lines: rows.map(({ line, product }) => ({
         ...line,
-        name: product!.name,
-        price: product!.price,
+        name: product.name,
+        price: product.price,
       })),
       address,
       payment,
@@ -185,7 +190,7 @@ export function CheckoutFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: order.id,
-          lines,
+          lines: orderLines,
           payment,
           paymentId,
           // The courier needs this; the row is unshippable without it.
@@ -232,7 +237,7 @@ export function CheckoutFlow({
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, address }),
+        body: JSON.stringify({ lines: orderLines, address }),
       });
       const order = await response.json();
       if (!response.ok) throw new Error(order.error ?? "Could not start payment.");
@@ -269,16 +274,20 @@ export function CheckoutFlow({
   };
 
   if (rows.length === 0) {
+    // Saying "empty" when the cart still holds pieces we have stopped stocking
+    // sends the shopper back to a cart that keeps insisting it has items.
     return (
       <div className="mx-auto w-full max-w-[1400px] px-5 py-24 text-center sm:px-8">
         <p className="text-sm font-light text-foreground/60">
-          Your cart is empty.
+          {missing.length > 0
+            ? "Nothing in your cart is available any more."
+            : "Your cart is empty."}
         </p>
         <Link
-          href="/dashboard"
+          href={missing.length > 0 ? "/dashboard/cart" : "/dashboard"}
           className="mt-5 inline-flex rounded-full bg-foreground px-7 py-3 text-sm font-medium text-background"
         >
-          Continue shopping
+          {missing.length > 0 ? "Back to your cart" : "Continue shopping"}
         </Link>
       </div>
     );
@@ -309,6 +318,16 @@ export function CheckoutFlow({
           Back to cart
         </Link>
       </div>
+
+      {missing.length > 0 ? (
+        <p className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm font-light">
+          {missing.length === 1 ? "One piece" : `${missing.length} pieces`} in your cart are no
+          longer stocked and are not part of this order.{" "}
+          <Link href="/dashboard/cart" className="underline underline-offset-4">
+            Review your cart
+          </Link>
+        </p>
+      ) : null}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
@@ -428,7 +447,7 @@ export function CheckoutFlow({
                       {rows.map(({ line, product }) => (
                         <li key={`${line.id}-${line.size}`} className="flex flex-wrap justify-between gap-3">
                           <div>
-                            <p className="font-serif text-lg">{product!.name}</p>
+                            <p className="font-serif text-lg">{product.name}</p>
                             <p className="mt-1 text-sm font-light text-foreground/60">
                               Size {line.size} · Qty {line.qty}
                             </p>
@@ -442,7 +461,7 @@ export function CheckoutFlow({
                             </p>
                           </div>
                           <p className="text-sm">
-                            ₹{(product!.price * line.qty).toLocaleString("en-IN")}
+                            ₹{(product.price * line.qty).toLocaleString("en-IN")}
                           </p>
                         </li>
                       ))}
