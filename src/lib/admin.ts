@@ -1,9 +1,11 @@
 import "server-only";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
+import type { Session } from "next-auth";
 
 /** Fallback owners, used when no ADMIN_EMAILS override is set. */
 const DEFAULT_ADMIN_EMAILS = [
+  "admin@gmail.com",
   "arishsingh9469@gmail.com",
   "mohitsalgotra@gmail.com",
   "23anuragsharma@gmail.com",
@@ -24,16 +26,19 @@ export function emailIsAdmin(email: string | null | undefined) {
   return Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase()));
 }
 
-/** Every admin surface and server action calls this — never trust the UI. */
-export async function getAdminUser() {
-  const user = await currentUser();
+/**
+ * Every admin surface and server action calls this — never trust the UI.
+ *
+ * The address comes from the session Auth.js signed, not from anything the
+ * request carried, and a session only ever holds an address that was either
+ * registered here or asserted by Google.
+ */
+export async function getAdminUser(): Promise<Session["user"] | null> {
+  const session = await auth();
+  const user = session?.user;
   if (!user) return null;
 
-  const emails = user.emailAddresses.map((entry) => entry.emailAddress);
-  const primary = user.primaryEmailAddress?.emailAddress;
-  const match = [primary, ...emails].some(emailIsAdmin);
-
-  return match ? user : null;
+  return emailIsAdmin(user.email) ? user : null;
 }
 
 export async function isAdmin() {

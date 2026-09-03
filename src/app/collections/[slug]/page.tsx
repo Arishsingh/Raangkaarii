@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { CollectionView } from "@/components/collection-view";
 import { FloatingActions } from "@/components/floating-actions";
@@ -19,8 +19,8 @@ export async function generateMetadata({ params }: PageProps<"/collections/[slug
 }
 
 export default async function CollectionPage({ params }: PageProps<"/collections/[slug]">) {
-  const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+  const session = await auth();
+  if (session?.user) redirect("/dashboard");
 
   const { slug } = await params;
   const collection = getCollection(slug, await getCollectionExtras(slug));

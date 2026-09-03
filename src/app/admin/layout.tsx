@@ -28,7 +28,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             <header className="mb-8">
               <AdminBreadcrumb />
               <p className="mt-2 text-sm text-muted-foreground">
-                Signed in as {admin.primaryEmailAddress?.emailAddress}. Everything
+                Signed in as {admin.email}. Everything
                 you add here goes live on the site straight away.
               </p>
             </header>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { CartProvider } from "@/components/cart-provider";
 import { OrdersView } from "@/components/orders-view";
@@ -10,8 +10,8 @@ import { WishlistProvider } from "@/components/wishlist-provider";
 export const metadata = { title: "Your orders — Rangkaarii" };
 
 export default async function OrdersPage() {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  const session = await auth();
+  if (!session?.user) redirect("/login");
 
   return (
     <WishlistProvider>

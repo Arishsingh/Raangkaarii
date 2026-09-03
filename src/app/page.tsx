@@ -2,7 +2,7 @@ import { CraftIntelligence } from "@/components/craft-intelligence";
 import { CraftStory } from "@/components/craft-story";
 import { FeatureVideos } from "@/components/feature-videos";
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { FloatingActions } from "@/components/floating-actions";
 import { Hero } from "@/components/hero";
@@ -13,8 +13,8 @@ import { SiteHeader } from "@/components/site-header";
 
 export default async function Home() {
   // Signed-in customers stay inside their account until they sign out.
-  const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+  const session = await auth();
+  if (session?.user) redirect("/dashboard");
 
   return (
     <>

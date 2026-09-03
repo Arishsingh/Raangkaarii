@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { CartProvider } from "@/components/cart-provider";
 import { CartView } from "@/components/cart-view";
@@ -11,8 +11,8 @@ import { getShopCatalog } from "@/lib/catalog";
 export const metadata = { title: "Your cart — Rangkaarii" };
 
 export default async function CartPage() {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  const session = await auth();
+  if (!session?.user) redirect("/login");
 
   /**
    * The cart holds ids only, and the browser cannot resolve them: the built-in

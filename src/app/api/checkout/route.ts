@@ -1,5 +1,5 @@
 import Razorpay from "razorpay";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { saveOrder, type StoredAddress } from "@/lib/orders-store";
 import { priceCart } from "@/lib/pricing";
@@ -47,8 +47,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await currentUser();
-  if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
+  const session = await auth();
+  if (!session?.user) {
+    return Response.json({ error: "Please sign in." }, { status: 401 });
+  }
+  const user = session.user;
 
   let lines: unknown;
   let addressInput: unknown;
@@ -69,8 +72,8 @@ export async function POST(request: Request) {
     .toString()
     .padStart(3, "0")}`;
 
-  const email = user.primaryEmailAddress?.emailAddress ?? "";
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const email = user.email ?? "";
+  const name = user.name ?? "";
 
   try {
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });

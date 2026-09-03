@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { ProductDetail } from "@/components/product-detail";
 import { CartProvider } from "@/components/cart-provider";
@@ -25,8 +25,8 @@ export async function generateMetadata({
 export default async function ProductPage({
   params,
 }: PageProps<"/dashboard/product/[id]">) {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  const session = await auth();
+  if (!session?.user) redirect("/login");
 
   const { id } = await params;
   const product = await getShopProduct(id);

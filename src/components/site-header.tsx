@@ -11,7 +11,7 @@ import {
   ShoppingBag,
   User,
 } from "lucide-react";
-import { useClerk, useUser } from "@clerk/nextjs";
+import { signOut, useSession } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -90,11 +90,17 @@ export function SiteHeader({
   /** Set by pages that have already checked the signed-in user server-side. */
   admin?: boolean;
 }) {
-  const { isSignedIn, user } = useUser();
-  const { signOut } = useClerk();
+  /**
+   * `status` is what keeps the header from flashing a Login button at someone
+   * who is signed in: until the session has loaded, neither side is rendered.
+   */
+  const { data: session, status } = useSession();
+  const isSignedIn = status === "authenticated";
+  const user = session?.user;
   const lovedCount = useWishlist()?.items.length ?? 0;
   const cartCount = useCart()?.count ?? 0;
   const [megaOpen, setMegaOpen] = React.useState(false);
+  const [signingOut, setSigningOut] = React.useState(false);
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openMega = React.useCallback(() => {
@@ -293,7 +299,13 @@ export function SiteHeader({
             </Button>
           ) : null}
 
-          {isSignedIn ? (
+          {status === "loading" ? (
+            // A fixed-width placeholder, so the row does not jump when it lands.
+            <span
+              aria-hidden
+              className="h-9 w-[4.5rem] animate-pulse rounded-lg bg-current/10"
+            />
+          ) : isSignedIn ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -315,11 +327,13 @@ export function SiteHeader({
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
                   <p className="truncate text-sm font-medium">
-                    {user?.firstName} {user?.lastName}
+                    {user?.name || user?.email}
                   </p>
-                  <p className="truncate text-xs font-light text-foreground/60">
-                    {user?.primaryEmailAddress?.emailAddress}
-                  </p>
+                  {user?.name ? (
+                    <p className="truncate text-xs font-light text-foreground/60">
+                      {user.email}
+                    </p>
+                  ) : null}
                 </div>
                 <DropdownMenuSeparator />
                 {locked ? null : (
@@ -332,8 +346,19 @@ export function SiteHeader({
                     <Link href="/admin">Store control</Link>
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={() => signOut({ redirectUrl: "/" })}>
-                  Sign out
+                <DropdownMenuItem
+                  disabled={signingOut}
+                  onSelect={(event) => {
+                    // Keep the menu open while the request is in flight, so the
+                    // item can say what is happening instead of vanishing.
+                    event.preventDefault();
+                    setSigningOut(true);
+                    // Auth.js clears the cookie and navigates; nothing here
+                    // touches the token itself.
+                    void signOut({ callbackUrl: "/" });
+                  }}
+                >
+                  {signingOut ? "Signing out…" : "Logout"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -346,7 +371,7 @@ export function SiteHeader({
                 !solid && "text-white hover:bg-white/15 hover:text-white",
               )}
             >
-              <Link href="/sign-in" aria-label="Login">
+              <Link href="/login" aria-label="Login">
                 <User className="size-5" />
                 <span className="hidden text-sm font-light sm:inline">Login</span>
               </Link>

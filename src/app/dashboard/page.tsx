@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { ShopBoard } from "@/components/shop-board";
 import { CartProvider } from "@/components/cart-provider";
@@ -10,12 +10,13 @@ import { SiteHeader } from "@/components/site-header";
 import { WishlistProvider } from "@/components/wishlist-provider";
 import { getShopCatalog } from "@/lib/catalog";
 import { isAdmin } from "@/lib/admin";
+import { firstNameOf } from "@/lib/session-user";
 
 export const metadata = { title: "Your account — Rangkaarii" };
 
 export default async function DashboardPage() {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  const session = await auth();
+  if (!session?.user) redirect("/login");
 
   const [{ products, filterGroups, maxPrice }, admin] = await Promise.all([
     getShopCatalog(),
@@ -31,7 +32,7 @@ export default async function DashboardPage() {
           <ShopBoard
             // Remount when the ceiling moves so the slider is never stale.
             key={maxPrice}
-            name={user.firstName ?? "there"}
+            name={firstNameOf(session.user)}
             products={products}
             filterGroups={filterGroups}
             maxPrice={maxPrice}

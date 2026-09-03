@@ -1,8 +1,8 @@
 import Image from "next/image";
-import { Activity, CalendarPlus, UserPlus, Users } from "lucide-react";
+import { CalendarPlus, KeyRound, UserPlus, Users } from "lucide-react";
 
 import { StatCard } from "@/components/admin/stat-card";
-import { getUserStats } from "@/lib/admin-stats";
+import { getUserStats, type SiteMember } from "@/lib/users-store";
 
 export const metadata = { title: "Users — Admin" };
 
@@ -14,13 +14,42 @@ function formatDate(value: number) {
   });
 }
 
-function formatRelative(value: number | null) {
-  if (!value) return "Never";
-  const days = Math.floor((Date.now() - value) / 86_400_000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days} days ago`;
-  return formatDate(value);
+/** How this person can get in — a password, Google, or both. */
+function signInMethods(member: SiteMember) {
+  if (member.providers.length === 0) return "—";
+  return member.providers
+    .map((provider) =>
+      provider === "password"
+        ? "Password"
+        : provider.charAt(0).toUpperCase() + provider.slice(1),
+    )
+    .join(" + ");
+}
+
+/** Google supplies an avatar; a password sign-up has none, so fall back to a letter. */
+function Avatar({ member }: { member: SiteMember }) {
+  if (member.imageUrl) {
+    return (
+      <Image
+        src={member.imageUrl}
+        alt=""
+        width={32}
+        height={32}
+        unoptimized
+        className="size-8 shrink-0 rounded-full object-cover"
+      />
+    );
+  }
+
+  const initial = (member.name || member.email || "?").charAt(0).toUpperCase();
+  return (
+    <span
+      aria-hidden
+      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+    >
+      {initial}
+    </span>
+  );
 }
 
 export default async function AdminUsersPage() {
@@ -31,7 +60,7 @@ export default async function AdminUsersPage() {
       <div>
         <h2 className="font-heading text-2xl font-light">Users on site</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Everyone with an account, live from Clerk.
+          Everyone with an account, from the store&apos;s own database.
         </p>
       </div>
 
@@ -55,10 +84,10 @@ export default async function AdminUsersPage() {
           icon={CalendarPlus}
         />
         <StatCard
-          label="Active this week"
-          value={stats.activeThisWeek.toLocaleString("en-IN")}
-          hint="Signed in within 7 days"
-          icon={Activity}
+          label="With Google"
+          value={stats.withGoogle.toLocaleString("en-IN")}
+          hint="Signing in through Google"
+          icon={KeyRound}
         />
       </section>
 
@@ -86,7 +115,7 @@ export default async function AdminUsersPage() {
                   <th className="px-4 py-3 font-medium">Member</th>
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Joined</th>
-                  <th className="px-4 py-3 font-medium">Last active</th>
+                  <th className="px-4 py-3 font-medium">Signs in with</th>
                 </tr>
               </thead>
               <tbody>
@@ -94,14 +123,7 @@ export default async function AdminUsersPage() {
                   <tr key={member.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <Image
-                          src={member.imageUrl}
-                          alt=""
-                          width={32}
-                          height={32}
-                          unoptimized
-                          className="size-8 shrink-0 rounded-full object-cover"
-                        />
+                        <Avatar member={member} />
                         <span className="truncate">{member.name}</span>
                       </div>
                     </td>
@@ -110,7 +132,7 @@ export default async function AdminUsersPage() {
                       {formatDate(member.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {formatRelative(member.lastActiveAt)}
+                      {signInMethods(member)}
                     </td>
                   </tr>
                 ))}

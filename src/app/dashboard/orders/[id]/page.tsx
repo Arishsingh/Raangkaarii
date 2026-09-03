@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { CartProvider } from "@/components/cart-provider";
 import { OrderDetail } from "@/components/order-detail";
@@ -12,8 +12,8 @@ export const metadata = { title: "Order — Rangkaarii" };
 export default async function OrderPage({
   params,
 }: PageProps<"/dashboard/orders/[id]">) {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  const session = await auth();
+  if (!session?.user) redirect("/login");
 
   const { id } = await params;
 

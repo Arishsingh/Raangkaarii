@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import {
   markOrderPaid,
@@ -50,8 +50,11 @@ function readAddress(value: unknown): StoredAddress | null {
  * Cash on delivery never touches Razorpay, so it is written here in full.
  */
 export async function POST(request: Request) {
-  const user = await currentUser();
-  if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
+  const session = await auth();
+  if (!session?.user) {
+    return Response.json({ error: "Please sign in." }, { status: 401 });
+  }
+  const user = session.user;
 
   let body: Body;
   try {
@@ -102,8 +105,8 @@ export async function POST(request: Request) {
     await saveOrder({
       id,
       userId: user.id,
-      email: user.primaryEmailAddress?.emailAddress ?? "",
-      name: [user.firstName, user.lastName].filter(Boolean).join(" "),
+      email: user.email ?? "",
+      name: user.name ?? "",
       lines: cart.lines,
       payment: "Cash on Delivery",
       paymentId: null,

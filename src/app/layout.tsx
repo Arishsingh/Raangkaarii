@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Geist_Mono, Parisienne, Poppins } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 
 import { Providers } from "@/components/providers";
 import "./globals.css";
@@ -42,9 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${poppins.variable} ${cormorant.variable} ${parisienne.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider>
-          <Providers>{children}</Providers>
-        </ClerkProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

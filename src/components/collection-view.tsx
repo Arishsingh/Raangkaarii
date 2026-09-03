@@ -183,7 +183,7 @@ export function CollectionView({ collection }: { collection: Collection }) {
 const PRICE_PROMPT = "Sign in to view price";
 
 /** Where a signed-out visitor lands when they tap a product. */
-const SIGN_IN_HREF = "/sign-in";
+const SIGN_IN_HREF = "/login";
 
 function ProductCard({ product }: { product: Product }) {
   return (

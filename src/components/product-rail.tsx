@@ -209,7 +209,7 @@ export function ProductRail() {
           {tabs[active].products.map((product) => (
             // A product is only shoppable once signed in, so that is where a
             // card leads; the header nav still reaches the collections.
-            <ProductCard key={product.name} product={product} href="/sign-in" />
+            <ProductCard key={product.name} product={product} href="/login" />
           ))}
         </div>
       </div>

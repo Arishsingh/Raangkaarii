@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 import { CartProvider } from "@/components/cart-provider";
 import { CheckoutFlow } from "@/components/checkout-flow";
@@ -12,8 +12,8 @@ import { estimatedDeliveryBy } from "@/lib/orders";
 export const metadata = { title: "Checkout — Rangkaarii" };
 
 export default async function CheckoutPage() {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  const session = await auth();
+  if (!session?.user) redirect("/login");
 
   // Same reason as the cart: only the server can see the whole catalogue.
   const { products } = await getShopCatalog();
