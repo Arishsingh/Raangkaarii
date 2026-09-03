@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { upload } from "@vercel/blob/client";
 import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,9 +14,50 @@ import {
 import { checkVideoCodec } from "@/lib/video-codec";
 
 /**
- * Uploads straight from the browser to Vercel Blob. The file never passes
- * through a Server Action, so large clips are not capped by the body limit.
+ * Sends one file at a time to /api/admin/upload, which stores it in the
+ * database and hands back the URL it will be served from.
+ *
+ * XMLHttpRequest rather than fetch, only because fetch still cannot report
+ * upload progress — and a clip going up over a phone connection needs a bar.
  */
+function put(
+  file: File,
+  kind: MediaKind,
+  onProgress: (percentage: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/admin/upload");
+    request.setRequestHeader("Content-Type", file.type);
+    request.setRequestHeader("x-media-kind", kind);
+    // Names can hold anything; a header cannot. Percent-encode it.
+    request.setRequestHeader("x-file-name", encodeURIComponent(file.name));
+
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress((event.loaded / event.total) * 100);
+    };
+
+    request.onload = () => {
+      let body: { url?: string; error?: string } = {};
+      try {
+        body = JSON.parse(request.responseText);
+      } catch {
+        // A proxy or a crash can answer with something that is not JSON.
+      }
+      if (request.status >= 200 && request.status < 300 && body.url) {
+        resolve(body.url);
+      } else {
+        reject(new Error(body.error ?? "Upload failed."));
+      }
+    };
+    request.onerror = () => reject(new Error("The connection dropped."));
+    request.ontimeout = () => reject(new Error("The upload timed out."));
+
+    request.send(file);
+  });
+}
+
+
 export function MediaUpload({
   kind,
   onUploaded,
@@ -38,9 +78,9 @@ export function MediaUpload({
     const limit = limitFor(kind);
     if (file.size > limit) {
       /**
-       * The whole Blob store is 1 GB, so an oversized file is not a matter of
-       * waiting longer — it would not fit. A file this far over is invariably
-       * an edit-quality export rather than something meant for the web, so say
+       * An oversized file is not a matter of waiting longer — the shop's whole
+       * database is half a gigabyte. A file this far over is invariably an
+       * edit-quality export rather than something meant for the web, so say
        * what to do about it rather than only quoting the number back.
        */
       toast.error(
@@ -48,7 +88,7 @@ export function MediaUpload({
         {
           description:
             kind === "video"
-              ? "That is an editing export, not a web video. Export it again as H.264 MP4 at 1080p — a minute comes out near 50 MB, and it will look the same on a phone."
+              ? "Export it again as H.264 MP4 at 720p or 1080p — a short product clip comes out at a few megabytes and looks the same on a phone."
               : "Save it as a JPEG or WebP at around 2000px on the long edge.",
           duration: 12000,
         },
@@ -80,14 +120,7 @@ export function MediaUpload({
 
     setProgress(0);
     try {
-      const blob = await upload(`products/${file.name}`, file, {
-        access: "public",
-        handleUploadUrl: "/api/admin/upload",
-        // Lets the route mint a token for this kind alone.
-        clientPayload: kind,
-        onUploadProgress: ({ percentage }) => setProgress(percentage),
-      });
-      return blob.url;
+      return await put(file, kind, setProgress);
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : "Upload failed.";
@@ -97,9 +130,9 @@ export function MediaUpload({
   };
 
   /**
-   * Files go up one at a time rather than in parallel: these are large clips,
-   * and a handful of concurrent multi-hundred-megabyte uploads is a good way to
-   * stall the tab. Sequential also keeps the progress bar meaningful.
+   * Files go up one at a time rather than in parallel: these are clips of a few
+   * megabytes each, and a handful of concurrent uploads is a good way to stall
+   * the tab. Sequential also keeps the progress bar meaningful.
    */
   const choose = async (picked: FileList | null) => {
     const files = [...(picked ?? [])];

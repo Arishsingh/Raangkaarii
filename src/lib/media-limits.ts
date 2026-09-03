@@ -16,16 +16,21 @@ export const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 export type MediaKind = "image" | "video";
 
 /**
- * Sized against the storage plan rather than against what a browser could
- * technically send. Blob on Hobby holds 1 GB in total, so a single 500 MB
- * upload — the old cap — would have taken half the store for one clip.
+ * Sized against the storage the shop actually has, rather than against what a
+ * browser could technically send.
  *
- * A minute of 1080p H.264 at a sensible quality lands near 55 MB and 720p near
- * 25 MB, so 100 MB is roomy for a product clip while leaving space for a
- * catalogue. Anything far above it is an editing export, not a web video.
+ * Media lives in the database now (see src/lib/media-store.ts), and the Neon
+ * free plan holds 0.5 GB for everything — orders and catalogue included. A
+ * 25 MB ceiling leaves room for a catalogue of clips; a WhatsApp or Instagram
+ * clip of a garment is a few megabytes, and anything far above this is an
+ * editing export rather than something meant for the web.
+ *
+ * These are also what a request can carry through a function comfortably: the
+ * bytes pass through the upload route now instead of going straight to a
+ * storage service.
  */
-export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export function limitFor(kind: MediaKind) {
   return kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;

@@ -43,6 +43,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  experimental: {
+    /**
+     * With a proxy in place Next buffers request bodies to allow a second read,
+     * and quietly truncates anything past this — see the note in src/proxy.ts.
+     * Sized just above the largest upload the admin panel accepts.
+     */
+    proxyClientMaxBodySize: "26mb",
+  },
+
   devIndicators: {
     // The floating action stack now lives bottom-right.
     position: "bottom-left",

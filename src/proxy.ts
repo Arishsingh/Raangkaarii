@@ -40,8 +40,14 @@ export const config = {
    * Static assets and Next's own routes are excluded; `/api/auth/*` in
    * particular must stay open, or signing in would require being signed in.
    * `/login` and `/signup` are public by virtue of not being in PROTECTED.
+   *
+   * `/api/admin/upload` is excluded for a different reason: when a proxy runs,
+   * Next buffers the whole request body in memory so it can be read twice, and
+   * past its limit it truncates the body *silently* rather than failing. That
+   * turned a 21 MB clip into a 10 MB corrupt one with no error anywhere. The
+   * route checks the admin session itself, which is the real gate regardless.
    */
   matcher: [
-    "/((?!api/auth|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!api/auth|api/admin/upload|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
   ],
 };

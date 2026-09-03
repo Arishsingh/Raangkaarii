@@ -2,7 +2,7 @@
 
 An online store for hand-embroidered Indian clothing — storefront, customer dashboard, and an admin panel for running the catalogue, all in one Next.js app.
 
-Built on the App Router with Auth.js (NextAuth v5) for accounts, Neon Postgres for orders, catalogue and users, Vercel Blob for product media, Razorpay for payments, and Delhivery for shipping.
+Built on the App Router with Auth.js (NextAuth v5) for accounts, Neon Postgres for orders, catalogue and users, the database for product media, Razorpay for payments, and Delhivery for shipping.
 
 ---
 
@@ -14,7 +14,7 @@ Built on the App Router with Auth.js (NextAuth v5) for accounts, Neon Postgres f
 | UI | React 19, Tailwind CSS v4, Radix UI / shadcn, Motion |
 | Auth | Auth.js / NextAuth v5 — email + password, and Google |
 | Database | Neon Postgres (`@neondatabase/serverless`) |
-| Media | Vercel Blob |
+| Media | Postgres (`media` table), served through `/api/media/[id]` |
 | Payments | Razorpay |
 | Shipping | Delhivery Express Parcel |
 | Assistant | Gemini 2.5 Flash |
@@ -128,7 +128,6 @@ Every value lives in `.env.local`, which is gitignored. The app degrades rather 
 | `GOOGLE_CLIENT_ID` | Continue with Google | Google Cloud Console → Credentials |
 | `GOOGLE_CLIENT_SECRET` | Continue with Google | Shown once, at client creation |
 | `DATABASE_URL` | Orders + catalogue | Neon → Connection string (pooled) |
-| `BLOB_READ_WRITE_TOKEN` | Product image/video upload | Vercel → Storage → Blob |
 | `RAZORPAY_KEY_ID` | Payments | Razorpay → Account & Settings → API Keys |
 | `RAZORPAY_KEY_SECRET` | Payment verification | Shown **once** at key generation |
 | `RAZORPAY_WEBHOOK_SECRET` | Webhook verification | Razorpay → Settings → Webhooks |
@@ -186,7 +185,8 @@ Gated on email — see `src/lib/admin.ts`. Every admin page and server action ca
 | `POST /api/checkout/verify` | Verifies the browser's payment signature |
 | `POST /api/orders` | Marks an order paid, or records a COD order |
 | `POST /api/razorpay/webhook` | Razorpay's server-to-server payment result |
-| `POST /api/admin/upload` | Signed Vercel Blob upload for product media |
+| `POST /api/admin/upload` | Stores a product photo or clip in the database |
+| `GET /api/media/[id]` | Serves one stored file, cached immutably |
 | `POST /api/admin/shipments` | Books a Delhivery parcel, records its waybill |
 | `GET /api/delhivery/serviceability` | Whether a pincode can be delivered to |
 | `POST /api/chat` | Shopping assistant |
@@ -231,9 +231,15 @@ Media reaches a card from two places.
 
 Files are taken in filename order and written out as numbered WebP at 1200px wide, so the paths the components reference never change. `cwebp` is required (`brew install webp`).
 
-**Admin uploads** go straight from the browser to Vercel Blob through a signed token minted by `POST /api/admin/upload`, so a large clip never passes through a serverless function. The token is minted per kind — image or video — so a photo cannot be used to push a video-sized file.
+**Admin uploads** are posted to `POST /api/admin/upload`, which checks the admin session, checks the type and size against `src/lib/media-limits.ts`, and stores the bytes in the `media` table. The browser gets back a `/api/media/<id>` URL.
 
-Every card degrades on its own when media cannot be fetched: a failed still falls back to a neutral tile, and a clip whose poster cannot load stops trusting it, loads the video far enough to report, and lands on the same tile. A blocked blob store therefore looks empty rather than broken.
+These used to go to Vercel Blob. A Blob store is suspended once the account passes its free allowance, and a suspended store answers **403 to every file** — the whole catalogue turned to grey tiles at once, with nothing the app could do. The database is storage the shop already has, so the media cannot be switched off separately from the products it belongs to.
+
+`/api/media/[id]` is public and cached immutably (`max-age=31536000`), and ids are random and never reused, so a file is read out of Postgres roughly once and served from the CDN after that. Uploads are capped at **8 MB an image and 25 MB a clip** — the whole Neon free plan is 0.5 GB, shared with orders and the catalogue.
+
+> **Note:** `/api/admin/upload` is deliberately excluded from the proxy matcher. When a proxy runs, Next buffers the request body to allow a second read and **silently truncates** anything past `experimental.proxyClientMaxBodySize` — a 21 MB clip arrived as a corrupt 10 MB one with no error. The route checks the admin session itself.
+
+Every card degrades on its own when media cannot be fetched: a failed still falls back to a neutral tile, and a clip whose poster cannot load stops trusting it, loads the video far enough to report, and lands on the same tile. A store that cannot serve its files therefore looks empty rather than broken.
 
 ## Data
 
@@ -243,6 +249,7 @@ Tables are created on first use — there is no migration step to run. Schema ch
 |---|---|
 | `orders` | Placed orders, their lines, totals, address, waybill, and payment status |
 | `admin_products` | Everything added through the admin panel |
+| `media` | Product photos and clips, as bytes — served by `/api/media/[id]` |
 | `hidden_builtins` | Built-in pieces the admin has retired — they live in code, so removal is recorded rather than deleted |
 | `users` | Accounts: name, email, image, `emailVerified`, bcrypt `password` (null for a Google-only account), `created_at`, `updated_at` |
 | `accounts` | Linked OAuth providers, one row per provider account — written by the Auth.js adapter |
@@ -293,7 +300,7 @@ Razorpay test and live keys are separate — a `rzp_test_` key silently fails ag
 
 | Symptom | Cause |
 |---|---|
-| Every uploaded photo is a placeholder tile; the blob URL returns `403 Your store is blocked` | Account-level state on the Vercel Blob store, usually billing or a spend cap. Nothing in the app can route around it — clear it in Vercel → Storage. |
+| Every uploaded photo is a placeholder tile | Media is served from `/api/media/[id]` now. Check `DATABASE_URL` is set and the `media` table has rows. Products added before the move still point at dead `*.blob.vercel-storage.com` URLs — re-upload their photos in the admin panel. |
 | Payment succeeds but the order stays `pending` | The webhook never arrived. It cannot reach localhost; check the URL and `RAZORPAY_WEBHOOK_SECRET` on a deployed URL. |
 | "Booking a parcel" fails with a 503 | `DELHIVERY_API_KEY` or `DELHIVERY_PICKUP_NAME` is unset, or the pickup name does not match one registered on the Delhivery account. |
 | Admin pages 404 for the right person | The email on their account is not in `ADMIN_EMAILS` (nor in the fallback list in `src/lib/admin.ts`). |
