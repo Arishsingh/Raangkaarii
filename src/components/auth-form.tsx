@@ -1,22 +1,9 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-/** Matches the instance password policy (Clerk → password_settings.min_length). */
-const PASSWORD_MIN_LENGTH = 15;
-
-/** Holds typed values across a recovery reload. */
-const RECOVERY_KEY = "rangkaarii:auth-recovery";
-
-/** Ensures the automatic recovery reload only ever happens once. */
-const AUTO_RESET_KEY = "rangkaarii:auth-auto-reset";
 
 type ClerkError = { message?: string; longMessage?: string } | null;
 
@@ -36,38 +23,6 @@ function isStaleAttempt(error: ClerkError) {
   );
 }
 
-/** Registration blocked because the identifier already belongs to a user. */
-function isTakenIdentifier(error: ClerkError) {
-  const text =
-    `${error?.message ?? ""} ${error?.longMessage ?? ""}`.toLowerCase();
-  return text.includes("taken") || text.includes("already exists");
-}
-
-/**
- * Sign in blocked because the account has no password — it was created through
- * a social provider. Clerk phrases this as a "verification strategy" problem,
- * which tells the person nothing about what to do next.
- */
-function isPasswordNotSet(error: ClerkError) {
-  const text =
-    `${error?.message ?? ""} ${error?.longMessage ?? ""}`.toLowerCase();
-  return (
-    text.includes("verification strategy is not valid") ||
-    text.includes("strategy_for_user_invalid")
-  );
-}
-
-/** Sign in blocked because no user matches the identifier. */
-function isUnknownAccount(error: ClerkError) {
-  const text =
-    `${error?.message ?? ""} ${error?.longMessage ?? ""}`.toLowerCase();
-  return (
-    text.includes("couldn't find your account") ||
-    text.includes("could not find your account") ||
-    text.includes("identifier not found")
-  );
-}
-
 function readError(error: ClerkError, fallback = "Something went wrong.") {
   if (!error) return fallback;
   return error.longMessage ?? error.message ?? fallback;
@@ -76,7 +31,7 @@ function readError(error: ClerkError, fallback = "Something went wrong.") {
 /* Google's brand mark keeps its four colours; it must not inherit currentColor. */
 function GoogleMark() {
   return (
-    <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
       <path
         fill="#4285F4"
         d="M23.52 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.47a5.53 5.53 0 0 1-2.4 3.63v3.01h3.88c2.27-2.09 3.57-5.17 3.57-8.88z"
@@ -97,41 +52,40 @@ function GoogleMark() {
   );
 }
 
+/**
+ * Google is the only way in.
+ *
+ * Email and password were removed deliberately: there is nothing to remember,
+ * nothing to reset, and no password for us to hold. Both pages render the same
+ * single action — only the wording changes, because someone who clicks "Sign
+ * in" and turns out to be new should still land in their account rather than
+ * be sent to a different page to start again.
+ */
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
-  const router = useRouter();
   const clerk = useClerk();
-  const { signIn } = useSignIn();
-  const { signUp } = useSignUp();
+  /**
+   * The gate is Clerk's own load state, not the sign-in/sign-up hooks.
+   *
+   * Those hooks hand back a "future" resource that is truthy the moment the
+   * component mounts, while `clerk.client` — the thing the redirect actually
+   * needs — is still null. Treating the resource as readiness left the button
+   * enabled before there was a client, so the first click threw instead of
+   * going anywhere.
+   */
+  const { isLoaded } = useAuth();
 
-  const [firstName, setFirstName] = React.useState("");
-  const [lastName, setLastName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
-  const [step, setStep] = React.useState<"details" | "code">("details");
-  const [code, setCode] = React.useState("");
   const [needsReset, setNeedsReset] = React.useState(false);
-  const [existingAccount, setExistingAccount] = React.useState(false);
-  const [missingAccount, setMissingAccount] = React.useState(false);
 
-  /**
-   * `reset()` only clears local state, so a client record still pointing at a
-   * deleted attempt survives it. Destroying the client forces a fresh one.
-   */
+  const isSignUp = mode === "sign-up";
+  const ready = isLoaded;
+
   /**
    * The stale attempt id lives in Clerk's browser client (cookie + local
    * storage), so destroying the resource is not enough — the storage has to go
    * too, otherwise the same dead id is rehydrated on the next attempt.
    */
-  const clearAutoResetGuard = React.useCallback(() => {
-    try {
-      window.sessionStorage.removeItem(AUTO_RESET_KEY);
-    } catch {
-      // Nothing to clear.
-    }
-  }, []);
-
   const purgeClerkStorage = React.useCallback(() => {
     try {
       for (const entry of document.cookie.split(";")) {
@@ -167,198 +121,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   }, [clerk, purgeClerkStorage]);
 
   const startOver = React.useCallback(async () => {
-    // Keep what the user typed (never the password) across the reload.
-    try {
-      window.sessionStorage.setItem(
-        RECOVERY_KEY,
-        JSON.stringify({ firstName, lastName, email }),
-      );
-    } catch {
-      // Not worth failing the recovery over.
-    }
     await hardResetClient();
     window.location.reload();
-  }, [email, firstName, hardResetClient, lastName]);
-
-  const isSignUp = mode === "sign-up";
-  const ready = isSignUp ? Boolean(signUp) : Boolean(signIn);
-
-  React.useEffect(() => {
-    try {
-      const saved = window.sessionStorage.getItem(RECOVERY_KEY);
-      if (!saved) return;
-      window.sessionStorage.removeItem(RECOVERY_KEY);
-      const values = JSON.parse(saved);
-      setFirstName(values.firstName ?? "");
-      setLastName(values.lastName ?? "");
-      setEmail(values.email ?? "");
-    } catch {
-      // Nothing preserved; the form just starts empty.
-    }
-  }, []);
-
-  /**
-   * A password alone does not always finish a sign-in. Clerk asks for an email
-   * code in two distinct cases, and the flow stalls if either is missed:
-   *   needs_second_factor — the account has MFA enrolled;
-   *   needs_client_trust  — no MFA, but this browser has not been seen before.
-   */
-  const needsEmailCode = (status: string | null) =>
-    status === "needs_second_factor" || status === "needs_client_trust";
-
-  /**
-   * `finalize()` is what converts a completed sign-in into the active session.
-   * Its `navigate` callback has to route through `decorateUrl`, which is what
-   * carries the session across Safari's tracking prevention.
-   */
-  const completeSignIn = React.useCallback(async () => {
-    const done = await signIn!.finalize({
-      navigate: ({ session, decorateUrl }) => {
-        const target = session?.currentTask
-          ? `/sign-in/tasks/${session.currentTask.key}`
-          : "/dashboard";
-        const url = decorateUrl(target);
-        // decorateUrl can hand back an absolute URL, which router.push rejects.
-        if (url.startsWith("http")) {
-          window.location.href = url;
-        } else {
-          router.push(url);
-        }
-      },
-    });
-    if (done.error) throw new Error(readError(done.error));
-  }, [router, signIn]);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!ready || pending) return;
-    setPending(true);
-    setError(null);
-    setExistingAccount(false);
-    setMissingAccount(false);
-
-    try {
-      if (isSignUp) {
-        // Registration happens on the server so a corrupted browser client
-        // cannot block it; then we sign in normally with the new credentials.
-        const response = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ firstName, lastName, email, password }),
-        });
-        const result = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          if (result.existingAccount) setExistingAccount(true);
-          throw new Error(result.error ?? "Could not create your account.");
-        }
-
-        if (!result.ticket) {
-          throw new Error(
-            "Account created — please sign in with your new details.",
-          );
-        }
-
-        // A sign-in ticket completes in one step. A password sign-in would stop
-        // at `needs_second_factor` here and never produce a session.
-        let entered = await signIn!.ticket({ ticket: result.ticket });
-        if (entered.error && isStaleAttempt(entered.error)) {
-          await hardResetClient();
-          entered = await signIn!.ticket({ ticket: result.ticket });
-        }
-        if (entered.error) {
-          throw new Error(
-            "Account created — please sign in with your new details.",
-          );
-        }
-
-        clearAutoResetGuard();
-        await completeSignIn();
-        return;
-      } else {
-        let attempt = await signIn!.password({ identifier: email, password });
-        if (attempt.error && isStaleAttempt(attempt.error)) {
-          await hardResetClient();
-          attempt = await signIn!.password({ identifier: email, password });
-        }
-        if (attempt.error) {
-          if (isUnknownAccount(attempt.error)) {
-            setMissingAccount(true);
-            throw new Error("No account found with that email.");
-          }
-          if (isPasswordNotSet(attempt.error)) {
-            throw new Error(
-              "This account doesn’t use a password — sign in with Google below.",
-            );
-          }
-          throw new Error(readError(attempt.error, "Wrong email or password."));
-        }
-        // Password alone leaves the sign-in needing an email code on this
-        // instance, so send it and collect the code before finalising.
-        if (needsEmailCode(signIn!.status)) {
-          const sent = await signIn!.mfa.sendEmailCode();
-          if (sent.error) throw new Error(readError(sent.error));
-          clearAutoResetGuard();
-          setStep("code");
-          return;
-        }
-
-        clearAutoResetGuard();
-        await completeSignIn();
-      }
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Something went wrong.";
-
-      // A stale client survived the in-place retry: purge its storage and
-      // reload once, restoring what was typed. Guarded so it cannot loop.
-      if (isStaleAttempt({ message })) {
-        let alreadyTried = true;
-        try {
-          alreadyTried = window.sessionStorage.getItem(AUTO_RESET_KEY) === "1";
-          window.sessionStorage.setItem(AUTO_RESET_KEY, "1");
-        } catch {
-          // Cannot track attempts, so fall through to the manual button.
-        }
-        if (!alreadyTried) {
-          await startOver();
-          return;
-        }
-        setNeedsReset(true);
-      }
-
-      setError(message);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const verifyCode = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!ready || pending) return;
-    setPending(true);
-    setError(null);
-
-    try {
-      const verified = await signIn!.mfa.verifyEmailCode({ code });
-      if (verified.error) {
-        throw new Error(readError(verified.error, "That code did not work."));
-      }
-      if (needsEmailCode(signIn!.status)) {
-        const sent = await signIn!.mfa.sendEmailCode();
-        if (sent.error) throw new Error(readError(sent.error));
-        setCode("");
-        throw new Error("One more code — we sent a fresh one to your inbox.");
-      }
-      await completeSignIn();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Something went wrong.",
-      );
-    } finally {
-      setPending(false);
-    }
-  };
+  }, [hardResetClient]);
 
   const withGoogle = async () => {
     if (!ready || pending) return;
@@ -376,17 +141,48 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       redirectUrlComplete: `${origin}/dashboard`,
     };
 
+    /**
+     * `clerk.client` can still be null for a moment after Clerk reports itself
+     * loaded, and it is replaced outright by a hard reset. Wait briefly for it
+     * rather than throwing on the first look — a click that lands in that gap
+     * should feel slow, not broken.
+     */
+    const waitForClient = async () => {
+      for (let attempt = 0; attempt < 25; attempt += 1) {
+        if (clerk.client) return clerk.client;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return null;
+    };
+
+    /**
+     * Always start from `signIn`, on both pages.
+     *
+     * Starting from `signUp` breaks the moment the Google account already
+     * exists: Clerk cannot create a second account for it, so it hands off to
+     * a transfer flow, and that handoff drops `redirectUrlComplete` — which
+     * lands the person on Clerk's own hosted portal instead of the shop.
+     * `signIn` has no such problem in the other direction, because
+     * <AuthenticateWithRedirectCallback /> transfers a genuinely new account
+     * into a sign-up on its own.
+     */
     const start = async () => {
-      const client = clerk.client;
-      if (!client) throw new Error("Could not start Google sign in.");
-      await (isSignUp
-        ? client.signUp.authenticateWithRedirect(params)
-        : client.signIn.authenticateWithRedirect(params));
+      const client = await waitForClient();
+      if (!client) {
+        throw new Error(
+          "Sign in did not finish loading. Please refresh and try again.",
+        );
+      }
+      await client.signIn.authenticateWithRedirect(params);
     };
 
     try {
       await start();
     } catch (caught) {
+      // Clerk's own error carries the reason; the generic fallback below never
+      // does, so log the whole thing before it is flattened to one sentence.
+      console.error("Google sign in failed", caught);
+
       const clerkError = (
         caught as { errors?: { message?: string; longMessage?: string }[] }
       )?.errors?.[0];
@@ -394,8 +190,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         message: caught instanceof Error ? caught.message : undefined,
       };
 
-      // A stale attempt on the client breaks SSO the same way it breaks
-      // password sign-up, so rebuild the client and try once more.
+      // A stale attempt on the client breaks SSO, so rebuild the client and
+      // try once more before giving the person something to click.
       if (isStaleAttempt(detail)) {
         try {
           await hardResetClient();
@@ -411,187 +207,64 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     }
   };
 
-  /* Clerk looks up this element by id; it must stay mounted across both steps. */
-  const captcha = (
-    <div key="clerk-captcha" id="clerk-captcha" className="empty:hidden" />
-  );
-
-  if (step === "code") {
-    return (
-      <>
-        <form onSubmit={verifyCode} className="space-y-5">
-          <div>
-            <h1 className="font-serif text-4xl">Check your inbox</h1>
-            <p className="mt-2 text-sm font-light text-foreground/65">
-              For your security we sent a 6-digit code to {email}.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="code">Verification code</Label>
-            <Input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="123456"
-            />
-          </div>
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-          <Button type="submit" disabled={pending} className="w-full">
-            {pending ? "Verifying…" : "Verify and continue"}
-          </Button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setStep("details");
-              setCode("");
-              setError(null);
-            }}
-            className="w-full text-sm font-light underline underline-offset-4"
-          >
-            Back
-          </button>
-        </form>
-        {captcha}
-      </>
-    );
-  }
-
   return (
-    <>
-      <form onSubmit={submit} className="space-y-5">
-        <div>
-          <h1 className="font-serif text-4xl">
-            {isSignUp ? "Create your account" : "Welcome back"}
-          </h1>
-          <p className="mt-2 text-sm font-light text-foreground/65">
-            {isSignUp
-              ? "Just a few details to get started."
-              : "Welcome back! Please enter your details."}
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/**
+       * Bot protection is on for this instance with the "smart" widget, and
+       * Clerk mounts that widget into this element. Without it every sign-up —
+       * including the OAuth redirect, which still runs the check — fails
+       * before it reaches Google, with no message worth showing.
+       */}
+      <div id="clerk-captcha" className="empty:hidden" />
 
-        {isSignUp ? (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
-              <Input
-                id="firstName"
-                autoComplete="given-name"
-                required
-                value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
-                placeholder="Meher"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
-              <Input
-                id="lastName"
-                autoComplete="family-name"
-                value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
-                placeholder="Kaur"
-              />
-            </div>
-          </div>
-        ) : null}
+      <div>
+        <h1 className="font-serif text-4xl">
+          {isSignUp ? "Create your account" : "Welcome back"}
+        </h1>
+        <p className="mt-2 text-sm font-light text-foreground/65">
+          {isSignUp
+            ? "One tap with Google and you are in — no password to set."
+            : "Sign in with the Google account you used before."}
+        </p>
+      </div>
 
+      <Button
+        type="button"
+        onClick={withGoogle}
+        disabled={pending || !ready}
+        variant="outline"
+        className="h-13 w-full gap-3 text-base"
+      >
+        <GoogleMark />
+        {pending
+          ? "Taking you to Google…"
+          : isSignUp
+            ? "Sign up with Google"
+            : "Sign in with Google"}
+      </Button>
+
+      {error ? (
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="Enter your email"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-            required
-            minLength={isSignUp ? PASSWORD_MIN_LENGTH : undefined}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="••••••••"
-          />
-          {isSignUp ? (
-            <p className="text-xs font-light text-foreground/55">
-              At least {PASSWORD_MIN_LENGTH} characters.
-            </p>
+          <p className="text-sm text-destructive">{error}</p>
+          {needsReset ? (
+            <button
+              type="button"
+              onClick={startOver}
+              className="text-sm font-medium underline underline-offset-4"
+            >
+              Reset and try again
+            </button>
           ) : null}
         </div>
+      ) : null}
 
-        {error ? (
-          <div className="space-y-2">
-            <p className="text-sm text-destructive">{error}</p>
-            {needsReset ? (
-              <button
-                type="button"
-                onClick={startOver}
-                className="text-sm font-medium underline underline-offset-4"
-              >
-                Reset and try again
-              </button>
-            ) : null}
-            {existingAccount ? (
-              <Link
-                href="/sign-in"
-                className="inline-block text-sm font-medium underline underline-offset-4"
-              >
-                Sign in instead
-              </Link>
-            ) : null}
-            {missingAccount ? (
-              <Link
-                href="/sign-up"
-                className="inline-block text-sm font-medium underline underline-offset-4"
-              >
-                Create an account
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
-
-        <Button type="submit" disabled={pending || !ready} className="w-full">
-          {pending ? "Please wait…" : isSignUp ? "Create account" : "Sign in"}
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={withGoogle}
-          disabled={pending || !ready}
-          className="w-full gap-2.5"
-        >
-          <GoogleMark />
-          {isSignUp ? "Sign up with Google" : "Sign in with Google"}
-        </Button>
-
-        <p className="text-center text-sm font-light text-foreground/65">
-          {isSignUp ? "Already have an account? " : "Don't have an account? "}
-          <Link
-            href={isSignUp ? "/sign-in" : "/sign-up"}
-            className="font-medium underline underline-offset-4"
-          >
-            {isSignUp ? "Sign in" : "Sign up for free"}
-          </Link>
-        </p>
-      </form>
-      {captcha}
-    </>
+      {/* Both pages do the same thing, so there is nowhere else to send
+          someone — say so rather than offer a pointless second door. */}
+      <p className="text-center text-sm font-light text-foreground/65">
+        {isSignUp
+          ? "Already have an account? Signing in with Google will find it."
+          : "New here? Signing in with Google creates your account."}
+      </p>
+    </div>
   );
 }

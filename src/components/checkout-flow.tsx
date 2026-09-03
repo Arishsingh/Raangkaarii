@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useCart } from "@/components/cart-provider";
 import type { Product } from "@/lib/products";
 import { splitCartLines } from "@/lib/cart-lines";
+import { ProductMedia } from "@/components/product-media";
 import {
   loadAddress,
   newOrderId,
@@ -445,20 +446,34 @@ export function CheckoutFlow({
                   <div className="border-t px-5 py-5">
                     <ul className="space-y-4">
                       {rows.map(({ line, product }) => (
-                        <li key={`${line.id}-${line.size}`} className="flex flex-wrap justify-between gap-3">
-                          <div>
-                            <p className="font-serif text-lg">{product.name}</p>
-                            <p className="mt-1 text-sm font-light text-foreground/60">
-                              Size {line.size} · Qty {line.qty}
-                            </p>
-                            <p className="mt-1 text-xs font-light text-green-700">
-                              Delivery by{" "}
-                              {new Date(deliveryBy).toLocaleDateString("en-IN", {
-                                weekday: "short",
-                                day: "numeric",
-                                month: "short",
-                              })}
-                            </p>
+                        <li
+                          key={`${line.id}-${line.size}`}
+                          className="flex flex-wrap items-start justify-between gap-3"
+                        >
+                          <div className="flex min-w-0 flex-1 gap-3">
+                            <span className="relative block aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                              <ProductMedia
+                                image={product.image}
+                                video={product.video}
+                                alt={product.alt}
+                                sizes="64px"
+                                compact
+                              />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="font-serif text-lg">{product.name}</p>
+                              <p className="mt-1 text-sm font-light text-foreground/60">
+                                Size {line.size} · Qty {line.qty}
+                              </p>
+                              <p className="mt-1 text-xs font-light text-green-700">
+                                Delivery by{" "}
+                                {new Date(deliveryBy).toLocaleDateString("en-IN", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </p>
+                            </div>
                           </div>
                           <p className="text-sm">
                             ₹{(product.price * line.qty).toLocaleString("en-IN")}

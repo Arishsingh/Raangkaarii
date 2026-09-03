@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/cart-provider";
+import { ProductMedia } from "@/components/product-media";
 import { PricePanel } from "@/components/checkout-flow";
 import type { Product } from "@/lib/products";
 import { priceBreakdown } from "@/lib/orders";
@@ -94,8 +95,21 @@ export function CartView({ products }: { products: Product[] }) {
               {rows.map(({ line, product }) => (
                 <article
                   key={`${line.id}-${line.size}`}
-                  className="flex h-full flex-col overflow-hidden rounded-2xl border bg-card"
+                  className="flex h-full overflow-hidden rounded-2xl border bg-card"
                 >
+                  <Link
+                    href={`/dashboard/product/${product.id}`}
+                    className="relative block w-28 shrink-0 self-stretch bg-muted sm:w-32"
+                  >
+                    <ProductMedia
+                      image={product.image}
+                      video={product.video}
+                      alt={product.alt}
+                      sizes="128px"
+                      compact
+                    />
+                  </Link>
+
                   <div className="flex flex-1 flex-col p-5">
                     <Link href={`/dashboard/product/${product.id}`}>
                       <h2 className="line-clamp-2 font-serif text-xl leading-snug transition-opacity hover:opacity-70">
