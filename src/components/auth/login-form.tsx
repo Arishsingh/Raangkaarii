@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,11 @@ import {
   FormError,
 } from "@/components/auth/auth-parts";
 import { safeCallbackUrl } from "@/lib/auth-redirect";
+
+type LoginValues = {
+  email: string;
+  password: string;
+};
 
 /**
  * Auth.js reports provider failures by redirecting back here with `?error=`.
@@ -33,32 +39,19 @@ export function LoginForm() {
   const params = useSearchParams();
   const callbackUrl = safeCallbackUrl(params.get("callbackUrl"));
 
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [fieldErrors, setFieldErrors] = React.useState<{
-    email?: string;
-    password?: string;
-  }>({});
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginValues>({
+    defaultValues: { email: "", password: "" },
+  });
   const [error, setError] = React.useState(() =>
     messageForProviderError(params.get("error")),
   );
-  const [pending, setPending] = React.useState(false);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (pending) return;
-
-    // Checked here for a quick answer only; the server checks it again.
-    const next: typeof fieldErrors = {};
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      next.email = "Please enter a valid email address.";
-    }
-    if (!password) next.password = "Please enter your password.";
-    setFieldErrors(next);
-    if (Object.keys(next).length > 0) return;
-
+  const submit = handleSubmit(async ({ email, password }) => {
     setError("");
-    setPending(true);
     try {
       /**
        * `redirect: false` so a failed sign-in stays on this page with its
@@ -73,7 +66,6 @@ export function LoginForm() {
       if (!result || result.error) {
         // One message for every kind of miss — see the authorize() comment.
         setError("Invalid email or password.");
-        setPending(false);
         return;
       }
 
@@ -83,9 +75,8 @@ export function LoginForm() {
     } catch (caught) {
       console.error("Sign in failed", caught);
       setError("Something went wrong. Please try again.");
-      setPending(false);
     }
-  };
+  });
 
   return (
     <div className="space-y-6">
@@ -103,26 +94,32 @@ export function LoginForm() {
           id="email"
           label="Email"
           type="email"
-          value={email}
-          onChange={setEmail}
           autoComplete="email"
-          error={fieldErrors.email}
-          disabled={pending}
+          error={errors.email?.message}
+          disabled={isSubmitting}
           autoFocus
+          registration={register("email", {
+            required: "Please enter your email address.",
+            pattern: {
+              value: EMAIL_PATTERN,
+              message: "Please enter a valid email address.",
+            },
+          })}
         />
         <AuthField
           id="password"
           label="Password"
           type="password"
-          value={password}
-          onChange={setPassword}
           autoComplete="current-password"
-          error={fieldErrors.password}
-          disabled={pending}
+          error={errors.password?.message}
+          disabled={isSubmitting}
+          registration={register("password", {
+            required: "Please enter your password.",
+          })}
         />
 
-        <Button type="submit" disabled={pending} className="h-12 w-full text-base">
-          {pending ? "Signing in…" : "Sign In"}
+        <Button type="submit" disabled={isSubmitting} className="h-12 w-full text-base">
+          {isSubmitting ? "Signing in…" : "Sign In"}
         </Button>
       </form>
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,46 +15,34 @@ import {
 } from "@/components/auth/auth-parts";
 import { safeCallbackUrl } from "@/lib/auth-redirect";
 
+type SignupValues = {
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
+
 export function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = safeCallbackUrl(params.get("callbackUrl"));
 
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [fieldErrors, setFieldErrors] = React.useState<{
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-  }>({});
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupValues>({
+    defaultValues: { email: "", password: "", confirmPassword: "" },
+  });
   const [error, setError] = React.useState("");
-  const [pending, setPending] = React.useState(false);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (pending) return;
-
-    /**
-     * The same three rules the server applies, run here so the answer is
-     * immediate. Nothing below depends on them having passed — `/api/register`
-     * re-checks every one.
-     */
-    const next: typeof fieldErrors = {};
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      next.email = "Please enter a valid email address.";
-    }
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      next.password = `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
-    }
-    if (confirmPassword !== password) {
-      next.confirmPassword = "Passwords do not match.";
-    }
-    setFieldErrors(next);
-    if (Object.keys(next).length > 0) return;
-
+  /**
+   * The same three rules the server applies, run here so the answer is
+   * immediate. Nothing below depends on them having passed — `/api/register`
+   * re-checks every one.
+   */
+  const submit = handleSubmit(async ({ email, password, confirmPassword }) => {
     setError("");
-    setPending(true);
 
     try {
       const response = await fetch("/api/register", {
@@ -69,7 +58,6 @@ export function SignupForm() {
 
       if (!response.ok) {
         setError(body.error ?? "Could not create your account. Please try again.");
-        setPending(false);
         return;
       }
 
@@ -95,9 +83,8 @@ export function SignupForm() {
     } catch (caught) {
       console.error("Sign up failed", caught);
       setError("Something went wrong. Please try again.");
-      setPending(false);
     }
-  };
+  });
 
   return (
     <div className="space-y-6">
@@ -115,36 +102,48 @@ export function SignupForm() {
           id="email"
           label="Email"
           type="email"
-          value={email}
-          onChange={setEmail}
           autoComplete="email"
-          error={fieldErrors.email}
-          disabled={pending}
+          error={errors.email?.message}
+          disabled={isSubmitting}
           autoFocus
+          registration={register("email", {
+            required: "Please enter your email address.",
+            pattern: {
+              value: EMAIL_PATTERN,
+              message: "Please enter a valid email address.",
+            },
+          })}
         />
         <AuthField
           id="password"
           label="Password"
           type="password"
-          value={password}
-          onChange={setPassword}
           autoComplete="new-password"
-          error={fieldErrors.password}
-          disabled={pending}
+          error={errors.password?.message}
+          disabled={isSubmitting}
+          registration={register("password", {
+            required: "Please enter a password.",
+            minLength: {
+              value: PASSWORD_MIN_LENGTH,
+              message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+            },
+          })}
         />
         <AuthField
           id="confirmPassword"
           label="Confirm Password"
           type="password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
           autoComplete="new-password"
-          error={fieldErrors.confirmPassword}
-          disabled={pending}
+          error={errors.confirmPassword?.message}
+          disabled={isSubmitting}
+          registration={register("confirmPassword", {
+            validate: (value) =>
+              value === getValues("password") || "Passwords do not match.",
+          })}
         />
 
-        <Button type="submit" disabled={pending} className="h-12 w-full text-base">
-          {pending ? "Creating account…" : "Create Account"}
+        <Button type="submit" disabled={isSubmitting} className="h-12 w-full text-base">
+          {isSubmitting ? "Creating account…" : "Create Account"}
         </Button>
       </form>
 

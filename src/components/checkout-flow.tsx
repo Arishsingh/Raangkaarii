@@ -6,6 +6,7 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, MapPin, Package, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,18 @@ export function CheckoutFlow({
 
 
   const [step, setStep] = React.useState(0);
+  // The confirmed address, set once the step-1 form is submitted; everything
+  // past that step (summary, payment, the saved order) reads this rather than
+  // the in-progress form state.
   const [address, setAddress] = React.useState<Address>(EMPTY);
+  const {
+    register,
+    handleSubmit,
+    watch,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<Address>({ defaultValues: EMPTY });
   /**
    * The answer carries the pincode it belongs to, so "still checking" is
    * derived from comparing it with what is typed rather than held as its own
@@ -84,11 +96,18 @@ export function CheckoutFlow({
   const [payment, setPayment] = React.useState<"Razorpay" | "Cash on Delivery">("Razorpay");
   const [scriptReady, setScriptReady] = React.useState(false);
   const [pending, setPending] = React.useState(false);
+  // Mirrors the form's "type" field in plain state so the toggle buttons
+  // re-render on click without watch()'s incompatible-library cost.
+  const [addressType, setAddressType] = React.useState<Address["type"]>(EMPTY.type);
 
   React.useEffect(() => {
     const saved = loadAddress();
-    if (saved) setAddress(saved);
-  }, []);
+    if (saved) {
+      setAddress(saved);
+      reset(saved);
+      setAddressType(saved.type);
+    }
+  }, [reset]);
 
   // Everything the admin panel has added, which the built-in list never saw.
   const { rows, missing } = React.useMemo(
@@ -110,7 +129,9 @@ export function CheckoutFlow({
   const itemCount = rows.reduce((total, row) => total + row.line.qty, 0);
   const totals = priceBreakdown(subtotal, itemCount);
 
-  const pincode = address.pincode.replace(/\D/g, "");
+  // Watched live so the serviceability lookup below fires as the shopper
+  // types, before the address form is submitted.
+  const pincode = (watch("pincode") || "").replace(/\D/g, "");
 
   React.useEffect(() => {
     if (pincode.length !== 6) return;
@@ -208,16 +229,16 @@ export function CheckoutFlow({
     router.push(`/dashboard/orders/${order.id}`);
   };
 
-  const submitAddress = (event: React.FormEvent) => {
-    event.preventDefault();
+  const submitAddress = handleSubmit((values) => {
     // Only a confirmed "no" blocks; an unreachable courier must not stop a sale.
     if (serviceable === false) {
       toast.error(`We cannot deliver to ${pincode} yet.`);
       return;
     }
-    saveAddress(address);
+    setAddress(values);
+    saveAddress(values);
     setStep(1);
-  };
+  });
 
   const placeOrder = async () => {
     if (pending || rows.length === 0) return;
@@ -374,10 +395,10 @@ export function CheckoutFlow({
                 {index === 0 && active ? (
                   <form onSubmit={submitAddress} className="space-y-4 border-t px-5 py-5">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Full name" id="name" value={address.name} onChange={(v) => setAddress({ ...address, name: v })} />
-                      <Field label="Phone number" id="phone" value={address.phone} onChange={(v) => setAddress({ ...address, phone: v })} pattern="[0-9]{10}" hint="10 digits" />
-                      <Field label="Pincode" id="pincode" value={address.pincode} onChange={(v) => setAddress({ ...address, pincode: v })} pattern="[0-9]{6}" hint="6 digits" />
-                      <Field label="Locality" id="locality" value={address.locality} onChange={(v) => setAddress({ ...address, locality: v })} />
+                      <Field label="Full name" id="name" error={errors.name?.message} registration={register("name", { required: "Please enter your name." })} />
+                      <Field label="Phone number" id="phone" hint="10 digits" error={errors.phone?.message} registration={register("phone", { required: "Please enter a phone number.", pattern: { value: /^[0-9]{10}$/, message: "Enter a 10 digit phone number." } })} />
+                      <Field label="Pincode" id="pincode" hint="6 digits" error={errors.pincode?.message} registration={register("pincode", { required: "Please enter a pincode.", pattern: { value: /^[0-9]{6}$/, message: "Enter a 6 digit pincode." } })} />
+                      <Field label="Locality" id="locality" error={errors.locality?.message} registration={register("locality", { required: "Please enter your locality." })} />
                     </div>
 
                     {checkingPincode ? (
@@ -397,10 +418,10 @@ export function CheckoutFlow({
                         Sorry, we cannot deliver to {pincode} yet.
                       </p>
                     ) : null}
-                    <Field label="Address (house no, building, street)" id="line1" value={address.line1} onChange={(v) => setAddress({ ...address, line1: v })} />
+                    <Field label="Address (house no, building, street)" id="line1" error={errors.line1?.message} registration={register("line1", { required: "Please enter your address." })} />
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="City" id="city" value={address.city} onChange={(v) => setAddress({ ...address, city: v })} />
-                      <Field label="State" id="state" value={address.state} onChange={(v) => setAddress({ ...address, state: v })} />
+                      <Field label="City" id="city" error={errors.city?.message} registration={register("city", { required: "Please enter your city." })} />
+                      <Field label="State" id="state" error={errors.state?.message} registration={register("state", { required: "Please enter your state." })} />
                     </div>
 
                     <div>
@@ -410,10 +431,13 @@ export function CheckoutFlow({
                           <button
                             key={option}
                             type="button"
-                            onClick={() => setAddress({ ...address, type: option })}
+                            onClick={() => {
+                              setValue("type", option);
+                              setAddressType(option);
+                            }}
                             className={cn(
                               "rounded-full border px-5 py-2 text-sm font-light transition-colors",
-                              address.type === option
+                              addressType === option
                                 ? "border-foreground bg-foreground text-background"
                                 : "hover:bg-muted",
                             )}
@@ -564,29 +588,31 @@ export function CheckoutFlow({
 function Field({
   label,
   id,
-  value,
-  onChange,
-  pattern,
   hint,
+  error,
+  registration,
 }: {
   label: string;
   id: string;
-  value: string;
-  onChange: (value: string) => void;
-  pattern?: string;
   hint?: string;
+  error?: string;
+  registration: UseFormRegisterReturn;
 }) {
+  const errorId = `${id}-error`;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
-        required
-        pattern={pattern}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        {...registration}
       />
-      {hint ? (
+      {error ? (
+        <p id={errorId} className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : hint ? (
         <p className="text-xs font-light text-foreground/50">{hint}</p>
       ) : null}
     </div>
