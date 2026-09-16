@@ -93,7 +93,7 @@ export function CheckoutFlow({
     city: string;
     state: string;
   }>({ pincode: "", serviceable: null, cod: true, city: "", state: "" });
-  const [payment, setPayment] = React.useState<"Razorpay" | "Cash on Delivery">("Razorpay");
+  const [payment, setPayment] = React.useState<"Razorpay">("Razorpay");
   const [scriptReady, setScriptReady] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   // Mirrors the form's "type" field in plain state so the toggle buttons
@@ -172,7 +172,6 @@ export function CheckoutFlow({
   const answered = lookup.pincode === pincode ? lookup : null;
   const checkingPincode = pincode.length === 6 && !answered;
   const serviceable = answered?.serviceable ?? null;
-  const codAvailable = answered ? answered.cod : true;
 
   const complete = async (receipt?: RazorpayResponse, serverId?: string) => {
     const paymentId = receipt?.razorpay_payment_id;
@@ -242,17 +241,6 @@ export function CheckoutFlow({
 
   const placeOrder = async () => {
     if (pending || rows.length === 0) return;
-
-    if (payment === "Cash on Delivery" && !codAvailable) {
-      toast.error("Cash on delivery is not available at this pincode.");
-      return;
-    }
-
-    if (payment === "Cash on Delivery") {
-      setPending(true);
-      await complete();
-      return;
-    }
 
     setPending(true);
     try {
@@ -409,9 +397,6 @@ export function CheckoutFlow({
                       <p className="text-xs text-muted-foreground">
                         We deliver to {answered?.city || pincode}
                         {answered?.state ? `, ${answered.state}` : ""}.
-                        {codAvailable
-                          ? ""
-                          : " Cash on delivery is not available here."}
                       </p>
                     ) : serviceable === false ? (
                       <p className="text-xs text-destructive">
@@ -524,7 +509,6 @@ export function CheckoutFlow({
                       {(
                         [
                           { value: "Razorpay", label: "UPI / Card / Netbanking", note: "Secured by Razorpay" },
-                          { value: "Cash on Delivery", label: "Cash on Delivery", note: "Pay when it arrives" },
                         ] as const
                       ).map((option) => (
                         <label
@@ -563,14 +547,12 @@ export function CheckoutFlow({
 
                     <Button
                       onClick={placeOrder}
-                      disabled={pending || (payment === "Razorpay" && !scriptReady)}
+                      disabled={pending || !scriptReady}
                       className="mt-6 rounded-full px-8"
                     >
                       {pending
                         ? "Processing…"
-                        : payment === "Cash on Delivery"
-                          ? "Place order"
-                          : `Pay ₹${totals.payable.toLocaleString("en-IN")}`}
+                        : `Pay ₹${totals.payable.toLocaleString("en-IN")}`}
                     </Button>
                   </div>
                 ) : null}
