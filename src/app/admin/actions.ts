@@ -226,7 +226,10 @@ export async function updateOrderStatusAction(
   }
 
   try {
-    await updateOrderStatus(orderId, status);
+    const change = await updateOrderStatus(orderId, status);
+    // A refusal is the store declining an unpaid order, not a failure to write.
+    if (!change.ok) return { ok: false, message: change.reason };
+
     revalidatePath("/admin/orders");
     revalidatePath("/admin/revenue");
     revalidatePath("/admin");

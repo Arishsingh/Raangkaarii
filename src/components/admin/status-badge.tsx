@@ -18,14 +18,19 @@ const STATUS_BADGES: Record<
   string,
   { label: string; icon: LucideIcon; className: string }
 > = {
+  /**
+   * "Pending Activation" read as though the shop owed this order an approval.
+   * It does not: the row is written before the payment window opens, so a
+   * pending order is one nobody has paid for yet.
+   */
   pending: {
-    label: "Pending Activation",
+    label: "Awaiting Payment",
     icon: Clock,
     className:
       "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
   active: {
-    label: "Active / Approved",
+    label: "Approved",
     icon: PackageCheck,
     className:
       "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -47,8 +52,9 @@ const STATUS_BADGES: Record<
     icon: PackageX,
     className: "border-destructive/30 bg-destructive/10 text-destructive",
   },
+  /** Money confirmed by Razorpay, and the one state that awaits the admin. */
   paid: {
-    label: "Paid Online",
+    label: "Paid — Approve",
     icon: CheckCircle2,
     className:
       "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",

@@ -6,9 +6,13 @@ import { listAdminProducts } from "@/lib/catalog-store";
 import { collectionHeadings } from "@/lib/collections";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getRevenueStats } from "@/lib/orders-store";
+import { syncRazorpayPayments } from "@/lib/razorpay-sync";
 import { categories, fabrics, sizeChoices } from "@/lib/products";
 
 export const metadata = { title: "Add product — Admin" };
+
+/** Takings move at Razorpay, so this page is read fresh rather than cached. */
+export const dynamic = "force-dynamic";
 
 const IMAGES = ["/hero.webp", "/hero-2.webp", "/hero-3.webp", "/hero-4.webp", "/hero-5.webp"];
 
@@ -17,6 +21,13 @@ export default async function AdminProductsPage({
 }: PageProps<"/admin">) {
   const { edit } = await searchParams;
   const editingId = typeof edit === "string" ? edit : undefined;
+
+  /**
+   * Razorpay is asked first, so the takings below count a payment the webhook
+   * may have failed to deliver. It writes only what is missing, so the read
+   * that follows sees the corrected rows.
+   */
+  await syncRazorpayPayments();
 
   // Independent reads, so they overlap rather than queue.
   const [added, stats] = await Promise.all([

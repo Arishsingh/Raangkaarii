@@ -51,9 +51,9 @@ export function AdminOverview({ stats }: { stats: RevenueStats }) {
           icon={IndianRupee}
         />
         <StatCard
-          label="Pending"
-          value={stats.pendingCount}
-          hint="Awaiting activation"
+          label="To approve"
+          value={stats.awaitingApprovalCount}
+          hint={`${stats.unpaidCount} unpaid checkout${stats.unpaidCount === 1 ? "" : "s"}`}
           icon={Clock}
         />
         <StatCard
@@ -76,6 +76,9 @@ export function AdminOverview({ stats }: { stats: RevenueStats }) {
           <h3 className="flex items-center gap-2 text-sm font-medium">
             <ShoppingBag className="size-4 text-muted-foreground" />
             Recent orders
+            <span className="text-xs font-normal text-muted-foreground">
+              paid only
+            </span>
           </h3>
           <Link
             href="/admin/orders"
@@ -87,7 +90,8 @@ export function AdminOverview({ stats }: { stats: RevenueStats }) {
 
         {stats.recent.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-            No orders yet. They appear here as soon as the first one is placed.
+            No paid orders yet. An order appears here once Razorpay confirms
+            the payment — a checkout that was opened and abandoned does not.
           </p>
         ) : (
           <ul className="divide-y divide-border/60">

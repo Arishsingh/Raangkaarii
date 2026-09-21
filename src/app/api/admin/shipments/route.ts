@@ -38,6 +38,35 @@ export async function POST(request: Request) {
     // Booking twice would leave two parcels against one order.
     return Response.json({ waybill: order.waybill, alreadyBooked: true });
   }
+
+  /**
+   * Two gates before a real parcel is booked against a live courier account.
+   *
+   * This route had neither. It would book a shipment for any order id an admin
+   * could name, including a checkout that was opened and abandoned — a parcel
+   * dispatched, and a COD amount set, for money that never arrived. The panel
+   * only ever hid the button; a direct POST went straight through.
+   */
+  if (!order.paymentVerified) {
+    return Response.json(
+      {
+        error:
+          "This order has no confirmed payment. Razorpay has not verified it, so no parcel can be booked.",
+      },
+      { status: 409 },
+    );
+  }
+  if (order.status !== "active") {
+    return Response.json(
+      {
+        error:
+          order.status === "paid"
+            ? "Approve this order first — a parcel is only booked once it has been activated."
+            : `An order that is ${order.status} cannot be shipped.`,
+      },
+      { status: 409 },
+    );
+  }
   if (!order.address) {
     return Response.json(
       { error: "This order has no delivery address, so it cannot be shipped." },

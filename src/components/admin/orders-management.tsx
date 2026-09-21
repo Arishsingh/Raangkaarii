@@ -15,22 +15,28 @@ import {
 import { toast } from "sonner";
 
 import { updateOrderStatusAction } from "@/app/admin/actions";
+import { MoneyBadge } from "@/components/admin/money-badge";
 import { ShipButton } from "@/components/admin/ship-button";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { moneyStateOf } from "@/lib/money-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDateTime, rupees } from "@/lib/format";
 import type { OrderStatus, StoredOrder } from "@/lib/orders-store";
 
-type Tab = "all" | "pending" | "active" | "shipped" | "delivered" | "cancelled";
+type Tab = "all" | "approve" | "active" | "shipped" | "delivered" | "cancelled";
 
 /**
  * Which order statuses each tab covers. The filter and the badge counts read
  * this same map, so a tab can never show a count it would not then list.
+ *
+ * Only payment-verified orders reach this page at all (see listAllOrders), so
+ * there is no longer a tab for unpaid ones — the first tab is the queue of
+ * paid orders waiting on the admin, which is the one that needs working.
  */
 const TAB_STATUSES: Record<Exclude<Tab, "all">, readonly OrderStatus[]> = {
-  pending: ["pending", "cod"],
-  active: ["active", "paid"],
+  approve: ["paid", "cod"],
+  active: ["active"],
   shipped: ["shipped"],
   delivered: ["delivered"],
   cancelled: ["cancelled"],
@@ -87,7 +93,7 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
   const counts = React.useMemo(() => {
     const tally: Record<Tab, number> = {
       all: initialOrders.length,
-      pending: 0,
+      approve: 0,
       active: 0,
       shipped: 0,
       delivered: 0,
@@ -119,8 +125,8 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
           {(
             [
               { id: "all", label: "All Orders", count: counts.all },
-              { id: "pending", label: "Pending", count: counts.pending },
-              { id: "active", label: "Active", count: counts.active },
+              { id: "approve", label: "To Approve", count: counts.approve },
+              { id: "active", label: "Approved", count: counts.active },
               { id: "shipped", label: "Shipped", count: counts.shipped },
               { id: "delivered", label: "Delivered", count: counts.delivered },
               { id: "cancelled", label: "Cancelled", count: counts.cancelled },
@@ -159,6 +165,17 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
         <div className="space-y-4">
           {filteredOrders.map((order) => {
             const isUpdating = updatingId === order.id;
+            const money = moneyStateOf(order);
+            /**
+             * Approval waits for the money to arrive, not merely to be taken.
+             *
+             * A captured payment still sits with Razorpay; it reaches the bank
+             * on their settlement cycle a day or more later. Approving — and
+             * so dispatching a parcel — before then means goods leaving on the
+             * strength of money the shop does not yet hold. COD is the
+             * exception: there is nothing to settle, the courier collects it.
+             */
+            const moneyArrived = money === "in-account" || money === "cod";
 
             return (
               <div
@@ -180,6 +197,10 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
                     <span className="rounded-md border border-border/60 bg-background px-2.5 py-0.5 text-xs text-muted-foreground">
                       {order.payment}
                     </span>
+                    <MoneyBadge
+                      state={moneyStateOf(order)}
+                      settledAt={order.settledAt}
+                    />
                     <StatusBadge status={order.status} />
                   </div>
                 </div>
@@ -258,23 +279,43 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
 
                       {/* Admin Controls */}
                       <div className="flex flex-wrap items-center gap-2">
-                        {order.status === "pending" || order.status === "cod" ? (
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 text-white hover:bg-emerald-700"
-                            disabled={isUpdating}
-                            onClick={() => handleUpdateStatus(order.id, "active")}
-                          >
-                            {isUpdating ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="size-3.5" />
-                            )}
-                            Activate Order
-                          </Button>
+                        {/*
+                          Approve, then ship — in that order, and only ever for
+                          an order Razorpay has confirmed.
+
+                          Approval used to be offered on `pending` too, which is
+                          an unpaid checkout, and the courier button appeared
+                          for `pending` and `paid` alike — so a parcel could be
+                          booked before anyone had approved the order, or paid
+                          for it. The server enforces both rules as well; this
+                          just stops the panel offering what it would refuse.
+                        */}
+                        {order.paymentVerified &&
+                        (order.status === "paid" || order.status === "cod") ? (
+                          moneyArrived ? (
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateStatus(order.id, "active")}
+                            >
+                              {isUpdating ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="size-3.5" />
+                              )}
+                              Approve for delivery
+                            </Button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-700 dark:text-sky-400">
+                              <Loader2 className="size-3.5" />
+                              Waiting for the money to reach your account —
+                              approval opens then
+                            </span>
+                          )
                         ) : null}
 
-                        {order.status === "active" || order.status === "paid" || order.status === "pending" ? (
+                        {order.paymentVerified && order.status === "active" ? (
                           <ShipButton
                             orderId={order.id}
                             waybill={order.waybill}
@@ -282,7 +323,17 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
                           />
                         ) : null}
 
-                        {(order.status === "shipped" || order.status === "active") && (
+                        {/* The waybill stays reachable once the parcel is booked. */}
+                        {order.status === "shipped" && order.waybill ? (
+                          <ShipButton
+                            orderId={order.id}
+                            waybill={order.waybill}
+                            shippable
+                          />
+                        ) : null}
+
+                        {/* Only a parcel that went out can be marked delivered. */}
+                        {order.status === "shipped" && (
                           <Button
                             size="sm"
                             variant="outline"

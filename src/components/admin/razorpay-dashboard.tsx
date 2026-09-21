@@ -44,6 +44,27 @@ export function RazorpayDashboard({
   const [query, setQuery] = React.useState("");
 
   /**
+   * Whether the secret is the *right* one, which is a different question from
+   * whether it is set.
+   *
+   * A wrong secret looks identical to a correct one from the environment: the
+   * variable is present, so the panel reported "Configured & Active" while
+   * every delivery Razorpay sent was being rejected for a signature mismatch.
+   * Thirty-two of them went by unnoticed that way, and a captured payment sat
+   * unrecorded for a day. Health is read from the deliveries themselves now.
+   */
+  const webhookHealth = React.useMemo(() => {
+    const recent = webhookEvents.slice(0, 20);
+    const rejected = recent.filter((e) => e.signatureValid === false).length;
+    return {
+      total: recent.length,
+      rejected,
+      // Nothing accepted, and something was rejected → the secret is wrong.
+      secretMismatch: rejected > 0 && rejected === recent.length,
+    };
+  }, [webhookEvents]);
+
+  /**
    * The origin is only knowable in the browser. Reading it through
    * useSyncExternalStore gives the server an empty snapshot and the client the
    * real value in the same render — where a setState-in-effect forced a second,
@@ -171,15 +192,33 @@ export function RazorpayDashboard({
               <span className="flex items-center gap-1.5 font-medium">
                 <Webhook className="size-3.5" /> RAZORPAY_WEBHOOK_SECRET
               </span>
-              {status.hasWebhookSecret ? (
+              {status.hasWebhookSecret && !webhookHealth.secretMismatch ? (
                 <CheckCircle2 className="size-4 text-emerald-500" />
               ) : (
-                <AlertTriangle className="size-4 text-amber-500" />
+                <AlertTriangle
+                  className={
+                    webhookHealth.secretMismatch
+                      ? "size-4 text-destructive"
+                      : "size-4 text-amber-500"
+                  }
+                />
               )}
             </div>
             <p className="mt-2 text-xs font-medium text-foreground">
-              {status.hasWebhookSecret ? "Configured & Active" : "Missing (Webhooks unverified)"}
+              {!status.hasWebhookSecret
+                ? "Missing (Webhooks unverified)"
+                : webhookHealth.secretMismatch
+                  ? "Set, but it does not match Razorpay"
+                  : "Configured & Active"}
             </p>
+            {webhookHealth.secretMismatch ? (
+              <p className="mt-2 text-xs text-destructive">
+                All {webhookHealth.rejected} recent deliveries were rejected for a
+                signature mismatch, so no payment can be recorded automatically.
+                Copy the secret from Settings → Webhooks and set
+                RAZORPAY_WEBHOOK_SECRET to it — in the deployment, not just locally.
+              </p>
+            ) : null}
           </div>
         </div>
 
