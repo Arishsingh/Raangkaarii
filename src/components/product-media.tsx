@@ -16,6 +16,7 @@ export function ProductMedia({
   compact = false,
   className,
   hoverToPlay = true,
+  eager = false,
 }: {
   image?: string;
   video?: string;
@@ -26,6 +27,8 @@ export function ProductMedia({
   className?: string;
   /** Cards hold on the photograph until hovered; pass false to autoplay. */
   hoverToPlay?: boolean;
+  /** Above-the-fold card: fetch its photo now, at high priority. */
+  eager?: boolean;
 }) {
   if (video) {
     return (
@@ -41,7 +44,7 @@ export function ProductMedia({
 
   if (image) {
     return (
-      <ProductImage src={image} alt={alt} sizes={sizes} className={className} />
+      <ProductImage src={image} alt={alt} sizes={sizes} className={className} eager={eager} />
     );
   }
 

@@ -110,7 +110,8 @@ export function MostViral({
                       <ProductImage
                         src={product.image}
                         alt={product.alt}
-                        sizes="(max-width: 640px) 62vw, (max-width: 1024px) 34vw, 20vw"
+                        sizes="(max-width: 640px) 62vw, (max-width: 1024px) 34vw, 280px"
+                        eager={index < 5}
                       />
                     </div>
                   )}

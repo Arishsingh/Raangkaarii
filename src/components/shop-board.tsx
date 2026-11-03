@@ -283,7 +283,7 @@ export function ShopBoard({
           </p>
         ) : (
           <div className="grid auto-rows-fr gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {visible.map((product) => {
+            {visible.map((product, index) => {
               const saved = loved.includes(product.id);
               return (
                 <article
@@ -307,6 +307,8 @@ export function ShopBoard({
                       // the raw viewport fractions would suggest.
                       sizes="(min-width: 1280px) 340px, (min-width: 768px) 30vw, (min-width: 640px) 45vw, 90vw"
                       compact
+                      // Two rows of three on desktop; the rest load as they near the screen.
+                      eager={index < 6}
                     />
                   </Link>
                   <div className="flex flex-1 flex-col p-5">
