@@ -241,3 +241,73 @@ export async function updateOrderStatusAction(
     return { ok: false, message: "Could not update order status." };
   }
 }
+
+export type QuickEditInput = {
+  id: string;
+  name: string;
+  price: number;
+  compareAt: number | null;
+  blurb: string;
+  sizes: string[];
+  inStock: boolean;
+};
+
+/**
+ * The quick edit on the shop's own cards: just the fields a bulk-imported piece
+ * is missing. Everything else on the record — photos, headings, fabric — is
+ * kept exactly as it was, and stays editable in the full form.
+ */
+export async function quickEditProduct(input: QuickEditInput): Promise<ActionState> {
+  try {
+    await assertAdmin();
+  } catch {
+    return { ok: false, message: "Not authorised." };
+  }
+
+  const id = String(input?.id ?? "").trim();
+  const name = String(input?.name ?? "").trim().slice(0, 160);
+  const price = Math.round(Number(input?.price));
+  const compareAt =
+    input?.compareAt === null || input?.compareAt === undefined || String(input.compareAt) === ""
+      ? null
+      : Math.round(Number(input.compareAt));
+  const sizes = Array.isArray(input?.sizes)
+    ? input.sizes.map(String).filter(Boolean).slice(0, 12)
+    : [];
+
+  if (!id) return { ok: false, message: "Missing product id." };
+  if (!name) return { ok: false, message: "Give the piece a name." };
+  if (!Number.isFinite(price) || price < 1) {
+    return { ok: false, message: "Enter a price of at least ₹1." };
+  }
+  if (compareAt !== null && (!Number.isFinite(compareAt) || compareAt <= price)) {
+    return { ok: false, message: "The was-price must be higher than the selling price." };
+  }
+
+  const existing = await getAdminProduct(id);
+  if (!existing) {
+    return { ok: false, message: "Could not load this piece. Please try again." };
+  }
+
+  try {
+    // The upsert writes only the editable columns; createdAt rides along unused.
+    await upsertAdminProduct({
+      ...existing,
+      name,
+      price,
+      compareAt,
+      blurb: String(input.blurb ?? "").trim().slice(0, 400),
+      sizes: sizes.length > 0 ? sizes : DEFAULT_SIZES,
+      inStock: Boolean(input.inStock),
+      // A placeholder alt ("Rangkaarii piece 12") follows the real name.
+      alt: /^Rangkaarii piece \d+$/.test(existing.alt) || !existing.alt ? name : existing.alt,
+    });
+    revalidateStorefront(existing.collections);
+    revalidatePath(`/dashboard/product/${id}`);
+  } catch (caught) {
+    console.error("Could not quick-edit product", caught);
+    return { ok: false, message: "Could not save. Please try again." };
+  }
+
+  return { ok: true, message: `Saved “${name}”.` };
+}

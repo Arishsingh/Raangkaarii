@@ -8,7 +8,12 @@ import { FloatingActions } from "@/components/floating-actions";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { WishlistProvider } from "@/components/wishlist-provider";
+import { HappyCustomers } from "@/components/showcase/happy-customers";
+import { MostLoved } from "@/components/showcase/most-loved";
+import { MostViral } from "@/components/showcase/most-viral";
 import { getShopCatalog } from "@/lib/catalog";
+import { listAdminProducts } from "@/lib/catalog-store";
+import { getShowcase } from "@/lib/showcase";
 import { isAdmin } from "@/lib/admin";
 import { firstNameOf } from "@/lib/session-user";
 
@@ -18,10 +23,14 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [{ products, filterGroups, maxPrice }, admin] = await Promise.all([
+  const [{ products, filterGroups, maxPrice }, admin, showcase] = await Promise.all([
     getShopCatalog(),
     isAdmin(),
+    getShowcase(),
   ]);
+
+  // Only pieces added through the panel have a row to edit; built-ins live in code.
+  const editableIds = admin ? (await listAdminProducts()).map((entry) => entry.id) : [];
 
   return (
     <WishlistProvider>
@@ -36,8 +45,12 @@ export default async function DashboardPage() {
             products={products}
             filterGroups={filterGroups}
             maxPrice={maxPrice}
+            editableIds={editableIds}
           />
         </Suspense>
+        <MostViral products={showcase.viral} signedIn />
+        <MostLoved products={showcase.loved} signedIn />
+        <HappyCustomers feedback={showcase.feedback} />
       </main>
       <SiteFooter locked />
       <FloatingActions />

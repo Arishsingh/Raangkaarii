@@ -1,6 +1,8 @@
 import "server-only";
 
-import { getSql, isDatabaseConfigured } from "@/lib/db";
+import { cache } from "react";
+
+import { getSql, isDatabaseConfigured, readWithFallback } from "@/lib/db";
 
 /** A product created through the admin panel. Superset of both catalogue shapes. */
 export type AdminProduct = {
@@ -161,20 +163,27 @@ function toProduct(row: Row): AdminProduct {
  * Reads never throw — a missing database or a cold table degrades to an empty
  * catalogue so the storefront keeps rendering its built-in products.
  */
-export async function listAdminProducts(): Promise<AdminProduct[]> {
+/**
+ * Memoised per request: one page asks for the catalogue from several places
+ * (the shop grid, the homepage shelves, the price ceiling), and over a slow
+ * link every extra round trip is another chance to time out.
+ */
+export const listAdminProducts = cache(async function listAdminProducts(): Promise<AdminProduct[]> {
   if (!isDatabaseConfigured()) return [];
-  try {
-    await ensureSchema();
-    const sql = getSql();
-    const rows = (await sql`
-      select * from admin_products order by created_at desc
-    `) as Row[];
-    return rows.map(toProduct);
-  } catch (error) {
-    console.error("Could not load admin products", error);
-    return [];
-  }
-}
+  return readWithFallback(
+    "admin-products",
+    async () => {
+      await ensureSchema();
+      const sql = getSql();
+      const rows = (await sql`
+        select * from admin_products order by created_at desc
+      `) as Row[];
+      return rows.map(toProduct);
+    },
+    [],
+    "Could not load admin products",
+  );
+});
 
 export async function getAdminProduct(id: string): Promise<AdminProduct | null> {
   if (!isDatabaseConfigured()) return null;
@@ -255,18 +264,20 @@ export async function adminProductIdExists(id: string) {
  * this never throws: without a database nothing is hidden, which keeps the
  * whole built-in catalogue on the site rather than emptying it.
  */
-export async function listHiddenBuiltIns(): Promise<string[]> {
+export const listHiddenBuiltIns = cache(async function listHiddenBuiltIns(): Promise<string[]> {
   if (!isDatabaseConfigured()) return [];
-  try {
-    await ensureSchema();
-    const sql = getSql();
-    const rows = (await sql`select id from hidden_builtins`) as { id: string }[];
-    return rows.map((row) => row.id);
-  } catch (error) {
-    console.error("Could not load hidden built-ins", error);
-    return [];
-  }
-}
+  return readWithFallback(
+    "hidden-builtins",
+    async () => {
+      await ensureSchema();
+      const sql = getSql();
+      const rows = (await sql`select id from hidden_builtins`) as { id: string }[];
+      return rows.map((row) => row.id);
+    },
+    [],
+    "Could not load hidden built-ins",
+  );
+});
 
 export async function hideBuiltIn(id: string) {
   await ensureSchema();

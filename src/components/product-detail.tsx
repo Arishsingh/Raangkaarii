@@ -21,6 +21,7 @@ import {
   seedReviews,
   type Review,
 } from "@/lib/reviews";
+import { PRICE_PENDING_LABEL, isPriced } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function Stars({ value, className }: { value: number; className?: string }) {
@@ -58,6 +59,7 @@ export function ProductDetail({
   const saved = wishlist?.has(product.id) ?? false;
 
   // Only a was-price above what is actually charged is an offer worth showing.
+  const priced = isPriced(product.price);
   const offer =
     product.compareAt && product.compareAt > product.price
       ? {
@@ -159,8 +161,12 @@ export function ProductDetail({
           </div>
 
           <div className="mt-5 flex flex-wrap items-baseline gap-3">
-            <p className="text-2xl">₹{product.price.toLocaleString("en-IN")}</p>
-            {offer ? (
+            {priced ? (
+              <p className="text-2xl">₹{product.price.toLocaleString("en-IN")}</p>
+            ) : (
+              <p className="text-xl font-light text-foreground/70">{PRICE_PENDING_LABEL}</p>
+            )}
+            {priced && offer ? (
               <>
                 <p className="text-lg font-light text-foreground/45 line-through">
                   ₹{offer.was.toLocaleString("en-IN")}
@@ -213,9 +219,10 @@ export function ProductDetail({
                 cart?.add(product.id, size);
                 toast.success(`${product.name} (${size}) added to your cart`);
               }}
+              disabled={!priced}
               className="rounded-full px-8"
             >
-              Add to cart
+              {priced ? "Add to cart" : PRICE_PENDING_LABEL}
             </Button>
             <Button
               variant="outline"

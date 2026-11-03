@@ -11,6 +11,17 @@
 
 const rupeeFormat = new Intl.NumberFormat("en-IN");
 
+/**
+ * Pieces imported in bulk go on the site before anyone has priced them. They
+ * carry a price of 0, which means "price to be added" — shown as such, and
+ * refused at the cart and at checkout until the admin sets one.
+ */
+export const PRICE_PENDING_LABEL = "Price coming soon";
+
+export function isPriced(price: number) {
+  return Number.isFinite(price) && price > 0;
+}
+
 /** A whole-rupee amount, e.g. `₹1,20,499`. */
 export function rupees(value: number) {
   return `₹${rupeeFormat.format(value)}`;

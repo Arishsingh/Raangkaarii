@@ -278,7 +278,7 @@ export function ProductForm({
               min={1}
               step={1}
               required
-              defaultValue={editing?.price}
+              defaultValue={editing?.price || ""}
               placeholder="4200"
             />
           </Field>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
+import { QuickEdit } from "@/components/admin/quick-edit";
 import { ProductMedia } from "@/components/product-media";
 import { ShopFilters } from "@/components/shop-filters";
 import { useCart } from "@/components/cart-provider";
@@ -26,6 +27,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { PRICE_PENDING_LABEL, isPriced, rupees } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const tabs = ["All", "New Arrivals", "Sale"];
@@ -35,13 +37,17 @@ export function ShopBoard({
   products = builtInProducts,
   filterGroups = builtInFilterGroups,
   maxPrice = MAX_PRICE,
+  editableIds = [],
 }: {
   name: string;
   products?: Product[];
   filterGroups?: FilterGroup[];
   /** Ceiling of the price slider; derived from the catalogue, never fixed. */
   maxPrice?: number;
+  /** Pieces the signed-in admin can edit in place. Empty for customers. */
+  editableIds?: string[];
 }) {
+  const editable = React.useMemo(() => new Set(editableIds), [editableIds]);
   const searchParams = useSearchParams();
   const lovedView = searchParams.get("view") === "loved";
   const [selected, setSelected] = React.useState<Record<string, string[]>>({});
@@ -126,7 +132,7 @@ export function ShopBoard({
         return false;
       }
       if (lovedView && !loved.includes(product.id)) return false;
-      if (tab === "Sale" && product.price >= 4000) return false;
+      if (tab === "Sale" && (product.price >= 4000 || !isPriced(product.price))) return false;
       if (tab === "New Arrivals" && product.price < 3000) return false;
       return true;
     });
@@ -282,8 +288,13 @@ export function ShopBoard({
               return (
                 <article
                   key={product.id}
-                  className="flex h-full flex-col overflow-hidden rounded-2xl border bg-card"
+                  className="relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card"
                 >
+                  {editable.has(product.id) ? (
+                    <div className="absolute right-3 top-3 z-10">
+                      <QuickEdit product={product} />
+                    </div>
+                  ) : null}
                   <Link
                     href={`/dashboard/product/${product.id}`}
                     className="relative block aspect-[4/5] shrink-0 bg-muted"
@@ -307,6 +318,16 @@ export function ShopBoard({
                     <p className="mt-1.5 line-clamp-2 text-sm font-light leading-relaxed text-foreground/60">
                       {product.blurb}
                     </p>
+                    {/* Only the admin sees prices on the grid — to spot what still needs one. */}
+                    {editable.has(product.id) ? (
+                      isPriced(product.price) ? (
+                        <p className="mt-2 text-sm font-medium">{rupees(product.price)}</p>
+                      ) : (
+                        <p className="mt-2 inline-flex w-fit rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                          Price to be added
+                        </p>
+                      )
+                    ) : null}
                     <div className="mt-auto flex items-center justify-between gap-3 pt-4">
                       {/* Buying needs a size, so this opens the piece's page. */}
                       <Link
@@ -331,11 +352,13 @@ export function ShopBoard({
                         <button
                           type="button"
                           aria-label={`Add ${product.name} to cart`}
+                          disabled={!isPriced(product.price)}
+                          title={isPriced(product.price) ? undefined : PRICE_PENDING_LABEL}
                           onClick={() => {
                             cart?.add(product.id, product.sizes[0]);
                             toast.success(`${product.name} added to your cart`);
                           }}
-                          className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85"
+                          className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:opacity-30"
                         >
                           <ShoppingBag className="size-4" strokeWidth={1.5} />
                         </button>

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isPriced } from "@/lib/format";
+
 import { getShopProduct } from "@/lib/catalog";
 import { DELIVERY_FEE, FREE_DELIVERY_OVER } from "@/lib/orders";
 import type { StoredOrderLine } from "@/lib/orders-store";
@@ -53,6 +55,10 @@ export async function priceCart(
     }
     if (!product.inStock) {
       return { cart: null, error: `${product.name} is out of stock.` };
+    }
+    // A bulk-imported piece is listed before it is priced; it is not for sale yet.
+    if (!isPriced(product.price)) {
+      return { cart: null, error: `${product.name} does not have a price yet.` };
     }
 
     lines.push({

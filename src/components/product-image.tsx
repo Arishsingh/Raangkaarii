@@ -35,7 +35,8 @@ export function ProductImage({
   // deserves its own attempt.
   const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
 
-  if (failedSrc === src) return <MediaFallback />;
+  // A video-only product has no still; an empty src would refetch the page.
+  if (!src || failedSrc === src) return <MediaFallback />;
 
   return (
     <Image

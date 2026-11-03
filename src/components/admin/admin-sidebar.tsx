@@ -11,6 +11,7 @@ import {
   Menu,
   PackagePlus,
   ShoppingBag,
+  Sparkles,
   Store,
   Users,
   type LucideIcon,
@@ -33,6 +34,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     items: [
       { href: "/admin", label: "Add product", icon: PackagePlus, exact: true },
       { href: "/admin/products", label: "Products on site", icon: Boxes },
+      { href: "/admin/showcase", label: "Homepage showcase", icon: Sparkles },
       { href: "/admin/orders", label: "Orders on site", icon: ShoppingBag },
       { href: "/admin/razorpay", label: "Razorpay Payments", icon: CreditCard },
       { href: "/admin/users", label: "Users on site", icon: Users },

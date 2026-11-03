@@ -61,6 +61,14 @@ export function ProductList({
     [headings],
   );
 
+  const unpriced = products.filter((product) => product.price <= 0).length;
+  const [onlyUnpriced, setOnlyUnpriced] = React.useState(false);
+  // Once the last one is priced the filter has nothing to show, so it lets go.
+  const showUnpriced = onlyUnpriced && unpriced > 0;
+  const visible = showUnpriced
+    ? products.filter((product) => product.price <= 0)
+    : products;
+
   if (products.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -70,8 +78,26 @@ export function ProductList({
   }
 
   return (
+    <div className="space-y-3">
+      {unpriced > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm">
+            <span className="font-medium">{unpriced}</span> piece
+            {unpriced === 1 ? " needs" : "s need"} a price before customers can buy{" "}
+            {unpriced === 1 ? "it" : "them"}.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant={showUnpriced ? "default" : "outline"}
+            onClick={() => setOnlyUnpriced((value) => !value)}
+          >
+            {showUnpriced ? "Show all products" : "Show only these"}
+          </Button>
+        </div>
+      ) : null}
     <ul className="space-y-3">
-      {products.map((product) => (
+      {visible.map((product) => (
         <li
           key={product.id}
           className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center"
@@ -89,7 +115,13 @@ export function ProductList({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2">
               <p className="font-heading text-sm font-medium">{product.name}</p>
-              <span className="text-sm">₹{product.price.toLocaleString("en-IN")}</span>
+              {product.price > 0 ? (
+                <span className="text-sm">₹{product.price.toLocaleString("en-IN")}</span>
+              ) : (
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[0.7rem] font-medium text-amber-700 dark:text-amber-400">
+                  Price to be added
+                </span>
+              )}
               {product.compareAt ? (
                 <span className="text-xs text-muted-foreground line-through">
                   ₹{product.compareAt.toLocaleString("en-IN")}
@@ -136,5 +168,6 @@ export function ProductList({
         </li>
       ))}
     </ul>
+    </div>
   );
 }
