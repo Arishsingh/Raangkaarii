@@ -39,6 +39,21 @@ export function QuickEdit({
   const [pending, startTransition] = React.useTransition();
   const [sizes, setSizes] = React.useState<string[]>(product.sizes);
   const priceRef = React.useRef<HTMLInputElement>(null);
+  const [price, setPrice] = React.useState(product.price > 0 ? String(product.price) : "");
+  const [was, setWas] = React.useState(product.compareAt ? String(product.compareAt) : "");
+  const [showWas, setShowWas] = React.useState(Boolean(product.compareAt));
+
+  const priceValue = Number(price);
+  const wasValue = Number(was);
+  // Said before saving, so a typo like ₹2,222,222 is caught while typing.
+  const wasProblem =
+    showWas && was !== "" && priceValue > 0 && wasValue <= priceValue
+      ? "Must be higher than the price — or remove it."
+      : null;
+  const discount =
+    showWas && was !== "" && priceValue > 0 && wasValue > priceValue
+      ? Math.round((1 - priceValue / wasValue) * 100)
+      : null;
   const [deleting, startDelete] = React.useTransition();
   const [confirming, setConfirming] = React.useState(false);
 
@@ -64,7 +79,8 @@ export function QuickEdit({
         id: product.id,
         name: String(data.get("name") ?? ""),
         price: Number(data.get("price")),
-        compareAt: data.get("compareAt") ? Number(data.get("compareAt")) : null,
+        // Removed or left empty means no offer.
+        compareAt: showWas && was !== "" ? Number(was) : null,
         blurb: String(data.get("blurb") ?? ""),
         sizes,
         inStock: data.get("inStock") === "on",
@@ -89,6 +105,9 @@ export function QuickEdit({
           event.stopPropagation();
           // Reopening shows what is saved now, not what was half-typed last time.
           setSizes(product.sizes);
+          setPrice(product.price > 0 ? String(product.price) : "");
+          setWas(product.compareAt ? String(product.compareAt) : "");
+          setShowWas(Boolean(product.compareAt));
           setConfirming(false);
           setOpen(true);
         }}
@@ -126,36 +145,77 @@ export function QuickEdit({
               <input name="name" required defaultValue={product.name} className={field} />
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Price (₹)</span>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Price (₹)</span>
+              <input
+                ref={priceRef}
+                name="price"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                required
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                placeholder="2499"
+                className={field}
+              />
+            </label>
+
+            {/* Optional: only for a piece on offer. Hidden until asked for. */}
+            {showWas ? (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <label
+                    htmlFor={`was-${product.id}`}
+                    className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    Was price (₹) <span className="normal-case tracking-normal">— optional</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWas("");
+                      setShowWas(false);
+                    }}
+                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
                 <input
-                  ref={priceRef}
-                  name="price"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  step={1}
-                  required
-                  defaultValue={product.price > 0 ? product.price : ""}
-                  placeholder="2499"
-                  className={field}
-                />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Was price (₹)</span>
-                <input
+                  id={`was-${product.id}`}
                   name="compareAt"
                   type="number"
                   inputMode="numeric"
                   min={1}
                   step={1}
-                  defaultValue={product.compareAt ?? ""}
-                  placeholder="Optional"
+                  value={was}
+                  onChange={(event) => setWas(event.target.value)}
+                  placeholder="The higher, original price"
                   className={field}
                 />
-              </label>
-            </div>
+                <span
+                  className={cn(
+                    "text-xs",
+                    wasProblem ? "text-destructive" : "text-muted-foreground",
+                  )}
+                >
+                  {wasProblem ??
+                    (discount
+                      ? `Customers will see ₹${Number(was).toLocaleString("en-IN")} crossed out — ${discount}% off.`
+                      : "Shown crossed out beside the price.")}
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowWas(true)}
+                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                + Add was price (show a discount)
+              </button>
+            )}
 
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</span>
@@ -241,7 +301,7 @@ export function QuickEdit({
                 <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={pending}>
+                <Button type="submit" disabled={pending || Boolean(wasProblem)}>
                   {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                   Save
                 </Button>
