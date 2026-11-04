@@ -1,15 +1,26 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { ArrowLeft, Star } from "lucide-react";
 
 /** Split-screen frame shared by the sign-in and sign-up pages. */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col px-6 py-8 sm:px-12">
-        <Link href="/" className="font-script text-3xl leading-none">
-          Rangkaarii
-        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <Link href="/" className="font-script text-3xl leading-none">
+            Rangkaarii
+          </Link>
+          {/* A plain link home rather than history.back(): visitors who
+              arrive from a shared link would otherwise leave the site. */}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            Back
+          </Link>
+        </div>
         <div className="flex flex-1 items-center justify-center py-10">
           <div className="w-full max-w-sm">{children}</div>
         </div>
