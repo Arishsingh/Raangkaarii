@@ -1,0 +1,138 @@
+import "server-only";
+
+import crypto from "node:crypto";
+
+import { getSql } from "@/lib/db";
+import { ensureAuthSchema, findUserByEmail } from "@/lib/users-store";
+
+/**
+ * Password reset tokens.
+ *
+ * The link in the email carries a random token; only its SHA-256 is stored, so
+ * a leaked copy of this table cannot be used to reset anyone's password. Each
+ * token works once, for a short window, and setting a new password voids every
+ * other outstanding token for that account.
+ */
+export const RESET_TOKEN_TTL_MINUTES = 30;
+/** Requests beyond this, per account per hour, are silently dropped. */
+const MAX_REQUESTS_PER_HOUR = 3;
+
+let schemaReady: Promise<void> | null = null;
+
+function ensureResetSchema() {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      await ensureAuthSchema();
+      const sql = getSql();
+      await sql`
+        create table if not exists password_reset_tokens (
+          token_hash text primary key,
+          user_id    uuid not null references users (id) on delete cascade,
+          expires_at timestamptz not null,
+          used_at    timestamptz,
+          created_at timestamptz not null default now()
+        )
+      `;
+      await sql`
+        create index if not exists password_reset_tokens_user_idx
+          on password_reset_tokens (user_id, created_at)
+      `;
+    })().catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+  }
+  return schemaReady;
+}
+
+function hashToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Issues a token for the account with this email. Returns null when there is
+ * no such account or it has asked too often — the caller must not reveal which.
+ */
+export async function createResetToken(
+  email: string,
+): Promise<{ token: string; name: string | null; email: string } | null> {
+  await ensureResetSchema();
+  const user = await findUserByEmail(email);
+  if (!user) return null;
+
+  const sql = getSql();
+  const [recent] = (await sql`
+    select count(*)::int as n
+      from password_reset_tokens
+     where user_id = ${user.id}
+       and created_at > now() - interval '1 hour'
+  `) as { n: number }[];
+  if ((recent?.n ?? 0) >= MAX_REQUESTS_PER_HOUR) return null;
+
+  const token = crypto.randomBytes(32).toString("base64url");
+  await sql`
+    insert into password_reset_tokens (token_hash, user_id, expires_at)
+    values (
+      ${hashToken(token)},
+      ${user.id},
+      now() + make_interval(mins => ${RESET_TOKEN_TTL_MINUTES})
+    )
+  `;
+  return { token, name: user.name, email: user.email };
+}
+
+/** Whether a token is still usable, without spending it — for the reset page. */
+export async function resetTokenIsValid(token: string) {
+  if (!token) return false;
+  await ensureResetSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    select 1
+      from password_reset_tokens
+     where token_hash = ${hashToken(token)}
+       and used_at is null
+       and expires_at > now()
+     limit 1
+  `) as unknown[];
+  return rows.length > 0;
+}
+
+/**
+ * Spends the token and sets the new password in one statement, so two
+ * submissions of the same link cannot both succeed. Returns false when the
+ * token is unknown, used or expired.
+ */
+export async function resetPassword(token: string, passwordHash: string) {
+  if (!token) return false;
+  await ensureResetSchema();
+  const sql = getSql();
+
+  const rows = (await sql`
+    with spent as (
+      update password_reset_tokens
+         set used_at = now()
+       where token_hash = ${hashToken(token)}
+         and used_at is null
+         and expires_at > now()
+      returning user_id
+    ),
+    updated as (
+      update users
+         set password = ${passwordHash}, updated_at = now()
+       where id = (select user_id from spent)
+      returning id
+    )
+    select id from updated
+  `) as { id: string }[];
+
+  const userId = rows[0]?.id;
+  if (!userId) return false;
+
+  // Any other link still sitting in their inbox stops working now.
+  await sql`
+    update password_reset_tokens
+       set used_at = now()
+     where user_id = ${userId} and used_at is null
+  `;
+  return true;
+}

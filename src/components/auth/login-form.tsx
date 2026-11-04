@@ -88,6 +88,14 @@ export function LoginForm() {
       </div>
 
       <FormError>{error}</FormError>
+      {params.get("reset") === "1" && !error ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+        >
+          Your password has been updated. Sign in with your new password.
+        </p>
+      ) : null}
 
       <form onSubmit={submit} className="space-y-4" noValidate>
         <AuthField
@@ -117,6 +125,14 @@ export function LoginForm() {
             required: "Please enter your password.",
           })}
         />
+        <div className="-mt-1 flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-light text-foreground/65 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         <Button type="submit" disabled={isSubmitting} className="h-12 w-full text-base">
           {isSubmitting ? "Signing in…" : "Sign In"}
