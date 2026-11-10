@@ -10,6 +10,7 @@ const findUserByEmail = vi.fn();
 const loginIsBlocked = vi.fn();
 const recordLoginFailure = vi.fn();
 const clearLoginFailures = vi.fn();
+const sendVerificationLink = vi.fn();
 
 type Config = {
   providers: { id?: string; authorize?: (c: unknown, r?: Request) => Promise<unknown> }[];
@@ -24,6 +25,10 @@ vi.mock("next-auth", () => ({
   CredentialsSignin: class CredentialsSignin extends Error {
     code = "credentials";
   },
+}));
+vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
+vi.mock("@/lib/admin-emails", () => ({
+  emailIsAdmin: (email: string) => email === "boss@example.com",
 }));
 vi.mock("next-auth/providers/credentials", () => ({
   default: (options: object) => ({ id: "credentials", ...options }),
@@ -60,7 +65,9 @@ beforeEach(() => {
     loginIsBlocked,
     recordLoginFailure,
     clearLoginFailures,
+    sendVerificationLink,
   ]) mock.mockReset();
+  sendVerificationLink.mockResolvedValue(true);
   loginIsBlocked.mockResolvedValue(false);
   recordLoginFailure.mockResolvedValue(undefined);
   clearLoginFailures.mockResolvedValue(undefined);
@@ -153,10 +160,31 @@ describe("login attempt limit", () => {
   });
 });
 
-describe("no email confirmation step", () => {
-  it("lets an account in with the right password even if its email was never confirmed", async () => {
+describe("email confirmation (admin-list accounts only)", () => {
+  it("lets an unconfirmed customer straight in, with no email", async () => {
     findUserByEmail.mockResolvedValue(customer({ emailVerified: null }));
     expect(await login("asha@example.com", "correct-horse-battery")).toMatchObject({ id: "user-1" });
+    expect(sendVerificationLink).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unconfirmed admin-list account and emails a link", async () => {
+    findUserByEmail.mockResolvedValue(customer({ email: "boss@example.com", emailVerified: null }));
+    await expect(login("boss@example.com", "correct-horse-battery")).rejects.toMatchObject({
+      code: "email_unverified",
+    });
+    expect(sendVerificationLink).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a confirmed admin-list account in", async () => {
+    findUserByEmail.mockResolvedValue(customer({ email: "boss@example.com" }));
+    expect(await login("boss@example.com", "correct-horse-battery")).toMatchObject({ id: "user-1" });
+    expect(sendVerificationLink).not.toHaveBeenCalled();
+  });
+
+  it("does not email anyone who gave the wrong password", async () => {
+    findUserByEmail.mockResolvedValue(customer({ email: "boss@example.com", emailVerified: null }));
+    expect(await login("boss@example.com", "wrong-password")).toBeNull();
+    expect(sendVerificationLink).not.toHaveBeenCalled();
   });
 });
 

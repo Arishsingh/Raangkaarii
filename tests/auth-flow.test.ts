@@ -14,6 +14,7 @@ delete process.env.GOOGLE_CLIENT_ID;
 
 const users = new Map<string, Record<string, unknown>>();
 const failures: string[] = [];
+const sendVerificationLink = vi.fn(async () => true);
 
 vi.mock("@auth/neon-adapter", () => ({ default: () => ({}) }));
 vi.mock("@neondatabase/serverless", async (original) => ({
@@ -24,6 +25,7 @@ vi.mock("@/lib/users-store", () => ({
   ensureAuthSchema: async () => {},
   findUserByEmail: async (email: string) => users.get(email.trim().toLowerCase()) ?? null,
 }));
+vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
 vi.mock("@/lib/login-limit", async (original) => ({
   ...(await original<typeof import("@/lib/login-limit")>()),
   loginIsBlocked: async (email: string) =>
@@ -47,6 +49,10 @@ beforeAll(async () => {
     id: "u-new", name: null, email: "new@example.com", image: null,
     password: hash, emailVerified: null,
   });
+  users.set("arishsingh9469@gmail.com", {
+    id: "u-arish", name: null, email: "arishsingh9469@gmail.com", image: null,
+    password: hash, emailVerified: null,
+  });
   users.set("admin@gmail.com", {
     id: "u-admin", name: "Admin", email: "admin@gmail.com", image: null,
     password: hash, emailVerified: new Date(),
@@ -55,6 +61,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   failures.length = 0;
+  sendVerificationLink.mockClear();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -111,10 +118,18 @@ describe("real Auth.js sign-in flow", () => {
     expect([unknown.error, unknown.code]).toEqual([wrong.error, wrong.code]);
   });
 
-  it("lets an unconfirmed account straight in — no confirmation email", async () => {
+  it("lets an unconfirmed customer straight in — no confirmation email", async () => {
     const result = await signInWith("new@example.com", "correct-horse-battery");
     expect(result.error).toBeNull();
     expect((await sessionFor(result.cookie)).user.email).toBe("new@example.com");
+    expect(sendVerificationLink).not.toHaveBeenCalled();
+  });
+
+  it("holds an unconfirmed admin account until the emailed link is opened", async () => {
+    const result = await signInWith("arishsingh9469@gmail.com", "correct-horse-battery");
+    expect(result.code).toBe("email_unverified");
+    expect(await sessionFor(result.cookie)).toBeNull();
+    expect(sendVerificationLink).toHaveBeenCalledTimes(1);
   });
 
   it("locks an address after 5 wrong passwords — even the right one is refused", async () => {

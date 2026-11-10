@@ -2,7 +2,10 @@ import bcrypt from "bcryptjs";
 
 import { BCRYPT_ROUNDS } from "@/auth";
 import { EMAIL_PATTERN, PASSWORD_MIN_LENGTH } from "@/lib/auth-rules";
-import { emailIsAdmin } from "@/lib/admin";
+import { emailIsAdmin } from "@/lib/admin-emails";
+import { emailConfigured } from "@/lib/email";
+import { sendVerificationLink } from "@/lib/email-verification";
+import { siteOrigin } from "@/lib/site-origin";
 import {
   createCredentialsUser,
   findUserByEmail,
@@ -59,13 +62,14 @@ export async function POST(request: Request) {
 
   /**
    * Admin access is decided by email address, and sign-up does not prove the
-   * address belongs to whoever typed it. So an address on the admin list can
-   * never be registered here — otherwise anyone could sign up as an admin
-   * whose account does not exist yet. Admins sign in to their existing
-   * account, or with Google, which does prove the address.
+   * address belongs to whoever typed it. So an admin-list address gets an
+   * account that cannot sign in until its owner opens an emailed link —
+   * which needs email to be working. Customers are not asked to confirm.
    */
-  if (emailIsAdmin(email)) {
-    return bad("This email can't be used to create an account. Please sign in instead.", 403);
+  const needsConfirmation = emailIsAdmin(email);
+  if (needsConfirmation && !emailConfigured()) {
+    console.error("Admin sign-up attempted but RESEND_API_KEY is not set");
+    return bad("This account can't be created right now. Please try again later.", 503);
   }
 
   try {
@@ -97,6 +101,16 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
+    }
+
+    if (needsConfirmation) {
+      try {
+        await sendVerificationLink(user, siteOrigin(request));
+      } catch (caught) {
+        // The account exists; signing in with the password sends a fresh link.
+        console.error("Could not send verification email", caught);
+      }
+      return Response.json({ ok: true, verify: true });
     }
 
     return Response.json({ ok: true });

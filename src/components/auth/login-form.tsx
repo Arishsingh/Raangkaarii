@@ -37,12 +37,15 @@ function messageForProviderError(code: string | null) {
 }
 
 /**
- * The code thrown by authorize() in src/auth.ts. Anything else — a wrong
+ * The codes thrown by authorize() in src/auth.ts. Anything else — a wrong
  * email or password alike — gets the one generic message.
  */
 function messageForSignInCode(code: string | undefined) {
   if (code === "rate_limited") {
     return "Too many sign-in attempts. Please wait 15 minutes, or reset your password.";
+  }
+  if (code === "email_unverified") {
+    return "This admin account isn't confirmed yet. We've emailed you a link — open it, then sign in.";
   }
   return "Invalid email or password.";
 }
@@ -100,6 +103,14 @@ export function LoginForm() {
       </div>
 
       <FormError>{error}</FormError>
+      {params.get("verified") === "1" && !error ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+        >
+          Your email is confirmed. Sign in to continue.
+        </p>
+      ) : null}
       {params.get("reset") === "1" && !error ? (
         <p
           role="status"
