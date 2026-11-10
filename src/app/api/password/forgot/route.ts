@@ -1,5 +1,3 @@
-import { after } from "next/server";
-
 import { emailConfigured, passwordResetEmail, sendEmail } from "@/lib/email";
 import { EMAIL_PATTERN } from "@/lib/auth-rules";
 import { createResetToken, RESET_TOKEN_TTL_MINUTES } from "@/lib/password-reset";
@@ -7,14 +5,16 @@ import { siteOrigin } from "@/lib/site-origin";
 import { normaliseEmail } from "@/lib/users-store";
 
 /**
- * Starts a password reset. The answer is the same whether or not the address
- * has an account, and the lookup and email happen after the response is sent,
- * so neither the wording nor the timing tells anyone who is a customer.
+ * Starts a password reset and reports what actually happened, so the screen
+ * can say "sent", "no account with this email" or "too many requests" rather
+ * than a guess.
+ *
+ * This deliberately tells a visitor whether an address has an account — the
+ * owner chose a clear answer for shoppers over hiding who is a customer. The
+ * per-account limit in createResetToken still stops it being used to flood
+ * anyone's inbox.
  */
-const GENERIC_OK = {
-  ok: true,
-  message: "If an account exists for that email, a reset link is on its way.",
-};
+export type ForgotStatus = "sent" | "no_account" | "rate_limited";
 
 export async function POST(request: Request) {
   let email = "";
@@ -37,25 +37,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const origin = siteOrigin(request);
-
-  after(async () => {
-    try {
-      const issued = await createResetToken(email);
-      if (!issued) return;
-
-      const link = `${origin}/reset-password?token=${encodeURIComponent(issued.token)}`;
-      const message = passwordResetEmail({
-        name: issued.name,
-        link,
-        minutes: RESET_TOKEN_TTL_MINUTES,
-      });
-      await sendEmail({ to: issued.email, ...message });
-      console.info("Password reset email sent");
-    } catch (caught) {
-      console.error("Could not send password reset email", caught);
+  try {
+    const issued = await createResetToken(email);
+    if (issued.status !== "issued") {
+      return Response.json({ ok: true, status: issued.status satisfies ForgotStatus });
     }
-  });
 
-  return Response.json(GENERIC_OK);
+    const link = `${siteOrigin(request)}/reset-password?token=${encodeURIComponent(issued.token)}`;
+    const message = passwordResetEmail({
+      name: issued.name,
+      link,
+      minutes: RESET_TOKEN_TTL_MINUTES,
+    });
+    await sendEmail({ to: issued.email, ...message });
+    console.info("Password reset email sent");
+    return Response.json({ ok: true, status: "sent" satisfies ForgotStatus });
+  } catch (caught) {
+    console.error("Could not send password reset email", caught);
+    return Response.json(
+      { error: "We couldn't send the email just now. Please try again in a minute." },
+      { status: 502 },
+    );
+  }
 }

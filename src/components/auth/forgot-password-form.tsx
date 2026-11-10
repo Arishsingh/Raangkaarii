@@ -14,7 +14,11 @@ export function ForgotPasswordForm() {
     formState: { errors, isSubmitting },
   } = useForm<{ email: string }>({ defaultValues: { email: "" } });
   const [error, setError] = React.useState("");
-  const [sentTo, setSentTo] = React.useState("");
+  /** What the server reported for the address just submitted. */
+  const [result, setResult] = React.useState<{
+    email: string;
+    status: "sent" | "no_account" | "rate_limited";
+  } | null>(null);
 
   const submit = handleSubmit(async ({ email }) => {
     setError("");
@@ -29,22 +33,75 @@ export function ForgotPasswordForm() {
         setError(body.error ?? "Something went wrong. Please try again.");
         return;
       }
-      setSentTo(email.trim());
+      setResult({ email: email.trim(), status: body.status ?? "sent" });
     } catch (caught) {
       console.error("Forgot password failed", caught);
       setError("Something went wrong. Please try again.");
     }
   });
 
-  if (sentTo) {
+  if (result?.status === "sent") {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="font-serif text-4xl">Check your email</h1>
+          <p
+            role="status"
+            className="mt-4 rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+          >
+            Email sent to <span className="font-medium">{result.email}</span>.
+          </p>
           <p className="mt-3 text-sm font-light leading-relaxed text-foreground/65">
-            If an account exists for <span className="font-medium text-foreground">{sentTo}</span>,
-            we&apos;ve sent a link to reset your password. It works for 30 minutes.
-            Don&apos;t see it? Check your spam folder.
+            Open the link in it to choose a new password. It works for 30 minutes.
+            Don&apos;t see it within a couple of minutes? Check your spam folder.
+          </p>
+        </div>
+        <Button asChild className="h-12 w-full text-base">
+          <Link href="/login">Back to sign in</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (result?.status === "no_account") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-serif text-4xl">No account found</h1>
+          <p className="mt-3 text-sm font-light leading-relaxed text-foreground/65">
+            There&apos;s no Rangkaarii account for{" "}
+            <span className="font-medium text-foreground">{result.email}</span>, so no
+            email was sent. Check the spelling, try another address, or create an
+            account.
+          </p>
+        </div>
+        <div className="space-y-3">
+          <Button asChild className="h-12 w-full text-base">
+            <Link href="/signup">Create an account</Link>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full text-base"
+            onClick={() => setResult(null)}
+          >
+            Try another email
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (result?.status === "rate_limited") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-serif text-4xl">Too many requests</h1>
+          <p className="mt-3 text-sm font-light leading-relaxed text-foreground/65">
+            We&apos;ve already sent several reset links to{" "}
+            <span className="font-medium text-foreground">{result.email}</span> in the
+            last hour, so no new email was sent. Use the most recent one in your inbox
+            (check spam too), or try again in an hour.
           </p>
         </div>
         <Button asChild className="h-12 w-full text-base">

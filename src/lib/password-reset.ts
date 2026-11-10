@@ -49,21 +49,22 @@ function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+export type ResetTokenResult =
+  | { status: "issued"; token: string; name: string | null; email: string }
+  | { status: "no_account" }
+  | { status: "rate_limited" };
+
 /**
- * Issues a token for the account with this email. Returns null when there is
- * no such account or it has asked too often — the caller must not reveal which.
+ * Issues a token for the account with this email, or says why it did not:
+ * no such account, or too many links already sent this hour. The forgot
+ * password screen shows the shopper which one happened.
  */
-export async function createResetToken(
-  email: string,
-): Promise<{ token: string; name: string | null; email: string } | null> {
+export async function createResetToken(email: string): Promise<ResetTokenResult> {
   await ensureResetSchema();
   const user = await findUserByEmail(email);
-  // Logged for us only: the visitor always sees the same answer, so without
-  // this a reset that silently sent nothing could not be told apart from one
-  // that was sent. No address is logged, only the reason.
   if (!user) {
     console.warn("Password reset skipped: no account with that email");
-    return null;
+    return { status: "no_account" };
   }
 
   const sql = getSql();
@@ -75,7 +76,7 @@ export async function createResetToken(
   `) as { n: number }[];
   if ((recent?.n ?? 0) >= MAX_REQUESTS_PER_HOUR) {
     console.warn(`Password reset skipped: ${MAX_REQUESTS_PER_HOUR} links already sent this hour`);
-    return null;
+    return { status: "rate_limited" };
   }
 
   const token = crypto.randomBytes(32).toString("base64url");
@@ -87,7 +88,7 @@ export async function createResetToken(
       now() + make_interval(mins => ${RESET_TOKEN_TTL_MINUTES})
     )
   `;
-  return { token, name: user.name, email: user.email };
+  return { status: "issued", token, name: user.name, email: user.email };
 }
 
 /** Whether a token is still usable, without spending it — for the reset page. */
