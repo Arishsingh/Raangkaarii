@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { emailConfigured, passwordResetEmail, sendEmail } from "@/lib/email";
 import { EMAIL_PATTERN } from "@/lib/auth-rules";
 import { createResetToken, RESET_TOKEN_TTL_MINUTES } from "@/lib/password-reset";
+import { siteOrigin } from "@/lib/site-origin";
 import { normaliseEmail } from "@/lib/users-store";
 
 /**
@@ -14,18 +15,6 @@ const GENERIC_OK = {
   ok: true,
   message: "If an account exists for that email, a reset link is on its way.",
 };
-
-/**
- * The link's origin comes from configuration, never from the request's Host
- * header — otherwise a forged header could make us email a link to someone
- * else's site.
- */
-function siteOrigin(request: Request) {
-  const configured = process.env.SITE_URL?.trim();
-  if (configured) return configured.replace(/\/+$/, "");
-  if (process.env.NODE_ENV === "production") return "https://www.rangkaarii.in";
-  return new URL(request.url).origin;
-}
 
 export async function POST(request: Request) {
   let email = "";

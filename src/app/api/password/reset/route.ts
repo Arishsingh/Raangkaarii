@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 
 import { BCRYPT_ROUNDS } from "@/auth";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth-rules";
+import { clearLoginFailures } from "@/lib/login-limit";
 import { resetPassword } from "@/lib/password-reset";
 
 /** Finishes a password reset: spends the emailed token and sets the new password. */
@@ -30,13 +31,17 @@ export async function POST(request: Request) {
 
   try {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const ok = await resetPassword(token, passwordHash);
-    if (!ok) {
+    const email = await resetPassword(token, passwordHash);
+    if (!email) {
       return Response.json(
         { error: "This reset link has expired or was already used. Please request a new one.", expired: true },
         { status: 400 },
       );
     }
+    // They proved they own the inbox; a lockout from earlier guesses ends here.
+    await clearLoginFailures(email).catch((caught) =>
+      console.error("Could not clear login failures", caught),
+    );
     return Response.json({ ok: true });
   } catch (caught) {
     console.error("Password reset failed", caught);

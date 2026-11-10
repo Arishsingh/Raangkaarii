@@ -1,18 +1,28 @@
 /** Where someone lands when nothing else was asked for. */
 export const DEFAULT_REDIRECT = "/dashboard";
 
+const OWN_ORIGIN = "https://rangkaarii.invalid";
+
 /**
  * Keeps a callbackUrl to this site.
  *
- * The value arrives in a query string, so anyone can put anything in it. Only
- * a single-slash absolute path is accepted: `//evil.example` and
- * `https://evil.example` are both browser-valid redirects away from the shop,
- * and a sign-in page that honours them is an open redirect.
+ * The value arrives in a query string, so anyone can put anything in it, and a
+ * sign-in page that follows it off-site is an open redirect. Prefix checks alone
+ * are not enough: browsers strip tabs and newlines and read backslashes as
+ * slashes, so "/\t/evil.example" or "/\\evil.example" become "//evil.example".
+ * Instead the value is resolved the way a browser would, and kept only if it
+ * stays on our own origin — returned as path, query and hash only.
  */
 export function safeCallbackUrl(value: string | null | undefined) {
-  if (!value) return DEFAULT_REDIRECT;
-  if (!value.startsWith("/") || value.startsWith("//")) return DEFAULT_REDIRECT;
-  // Backslashes are normalised to slashes by some browsers, so "/\evil" counts.
-  if (value.startsWith("/\\")) return DEFAULT_REDIRECT;
-  return value;
+  if (!value || !value.startsWith("/")) return DEFAULT_REDIRECT;
+
+  let resolved: URL;
+  try {
+    resolved = new URL(value, OWN_ORIGIN);
+  } catch {
+    return DEFAULT_REDIRECT;
+  }
+  if (resolved.origin !== OWN_ORIGIN) return DEFAULT_REDIRECT;
+
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }

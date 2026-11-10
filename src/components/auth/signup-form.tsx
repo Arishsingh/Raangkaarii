@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,6 @@ type SignupValues = {
 };
 
 export function SignupForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = safeCallbackUrl(params.get("callbackUrl"));
 
@@ -35,6 +33,7 @@ export function SignupForm() {
     defaultValues: { email: "", password: "", confirmPassword: "" },
   });
   const [error, setError] = React.useState("");
+  const [sentTo, setSentTo] = React.useState("");
 
   /**
    * The same three rules the server applies, run here so the answer is
@@ -62,29 +61,36 @@ export function SignupForm() {
       }
 
       /**
-       * Straight in, rather than back to the sign-in page to type the same
-       * password again. The session is minted by Auth.js from the credentials
-       * just registered — the signup endpoint never issues one itself.
+       * No automatic sign-in: the account only works once the emailed link
+       * has been opened, which proves the address belongs to whoever typed it.
        */
-      const result = await signIn("credentials", {
-        email: email.trim(),
-        password,
-        redirect: false,
-      });
-
-      if (!result || result.error) {
-        // The account exists; only the automatic sign-in did not happen.
-        router.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-        return;
-      }
-
-      router.replace(callbackUrl);
-      router.refresh();
+      setSentTo(email.trim());
     } catch (caught) {
       console.error("Sign up failed", caught);
       setError("Something went wrong. Please try again.");
     }
   });
+
+  if (sentTo) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-serif text-4xl">Confirm your email</h1>
+          <p className="mt-3 text-sm font-light leading-relaxed text-foreground/65">
+            We&apos;ve sent a link to{" "}
+            <span className="font-medium text-foreground">{sentTo}</span>. Open it to
+            finish creating your account, then sign in. It works for 24 hours.
+            Don&apos;t see it? Check your spam folder.
+          </p>
+        </div>
+        <Button asChild className="h-12 w-full text-base">
+          <Link href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
+            Go to sign in
+          </Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

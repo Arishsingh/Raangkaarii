@@ -38,6 +38,8 @@ export async function getAdminUser(): Promise<Session["user"] | null> {
   const user = session?.user;
   if (!user) return null;
 
+  // An address on the list is only worth anything once its owner proved it.
+  if (!user.verified) return null;
   return emailIsAdmin(user.email) ? user : null;
 }
 

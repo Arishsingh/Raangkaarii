@@ -97,6 +97,8 @@ export type AccountUser = {
   email: string;
   image: string | null;
   password: string | null;
+  /** When the address was proven, by an emailed link or by Google; null until then. */
+  emailVerified: Date | null;
 };
 
 /** Emails are stored and compared lowercased, so a lookup can never miss on case. */
@@ -108,7 +110,7 @@ export async function findUserByEmail(email: string): Promise<AccountUser | null
   await ensureAuthSchema();
   const sql = getSql();
   const rows = (await sql`
-    select id, name, email, image, password
+    select id, name, email, image, password, "emailVerified"
       from users
      where email = ${normaliseEmail(email)}
      limit 1
@@ -131,10 +133,31 @@ export async function createCredentialsUser(input: {
     insert into users (name, email, password)
     values (${input.name}, ${normaliseEmail(input.email)}, ${input.passwordHash})
     on conflict (email) do nothing
-    returning id, name, email, image, password
+    returning id, name, email, image, password, "emailVerified"
   `) as AccountUser[];
   // Nothing returned means the email was taken between the check and the write.
   return rows[0] ?? null;
+}
+
+/**
+ * Called when Google has just proven someone owns this address, before Auth.js
+ * links the Google account to an existing user with the same email.
+ *
+ * A password account nobody ever confirmed may have been registered by someone
+ * else, squatting the address. Linking it as-is would hand that person a
+ * verified account, so its password is dropped first; the real owner can set
+ * one later through "Forgot password". A confirmed account is left alone —
+ * its password holder proved the address too.
+ */
+export async function claimUnverifiedAccountForGoogle(email: string) {
+  await ensureAuthSchema();
+  const sql = getSql();
+  await sql`
+    update users
+       set password = null, "emailVerified" = now(), updated_at = now()
+     where email = ${normaliseEmail(email)}
+       and "emailVerified" is null
+  `;
 }
 
 export type SiteMember = {

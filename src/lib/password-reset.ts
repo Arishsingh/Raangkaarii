@@ -99,11 +99,14 @@ export async function resetTokenIsValid(token: string) {
 
 /**
  * Spends the token and sets the new password in one statement, so two
- * submissions of the same link cannot both succeed. Returns false when the
- * token is unknown, used or expired.
+ * submissions of the same link cannot both succeed. Returns the account's
+ * email, or null when the token is unknown, used or expired.
  */
-export async function resetPassword(token: string, passwordHash: string) {
-  if (!token) return false;
+export async function resetPassword(
+  token: string,
+  passwordHash: string,
+): Promise<string | null> {
+  if (!token) return null;
   await ensureResetSchema();
   const sql = getSql();
 
@@ -118,15 +121,18 @@ export async function resetPassword(token: string, passwordHash: string) {
     ),
     updated as (
       update users
-         set password = ${passwordHash}, updated_at = now()
+         set password = ${passwordHash},
+             -- The reset link reached their inbox, so the address is proven.
+             "emailVerified" = coalesce("emailVerified", now()),
+             updated_at = now()
        where id = (select user_id from spent)
-      returning id
+      returning id, email
     )
-    select id from updated
-  `) as { id: string }[];
+    select id, email from updated
+  `) as { id: string; email: string }[];
 
   const userId = rows[0]?.id;
-  if (!userId) return false;
+  if (!userId) return null;
 
   // Any other link still sitting in their inbox stops working now.
   await sql`
@@ -134,5 +140,5 @@ export async function resetPassword(token: string, passwordHash: string) {
        set used_at = now()
      where user_id = ${userId} and used_at is null
   `;
-  return true;
+  return rows[0].email;
 }

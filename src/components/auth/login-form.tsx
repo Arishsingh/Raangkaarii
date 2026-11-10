@@ -30,8 +30,24 @@ function messageForProviderError(code: string | null) {
     return "This email is already registered with a password. Sign in with your password below, for this once.";
   }
   if (code === "CredentialsSignin") return "Invalid email or password.";
-  if (code === "AccessDenied") return "That account cannot be used to sign in.";
+  if (code === "AccessDenied") {
+    return "That Google account's email isn't verified, so it can't be used to sign in.";
+  }
   return "Something went wrong. Please try again.";
+}
+
+/**
+ * The codes thrown by authorize() in src/auth.ts. Anything else — a wrong
+ * email or password alike — gets the one generic message.
+ */
+function messageForSignInCode(code: string | undefined) {
+  if (code === "rate_limited") {
+    return "Too many sign-in attempts. Please wait 15 minutes, or reset your password.";
+  }
+  if (code === "email_unverified") {
+    return "Please confirm your email first. We've sent you a new link — open it, then sign in.";
+  }
+  return "Invalid email or password.";
 }
 
 export function LoginForm() {
@@ -64,8 +80,7 @@ export function LoginForm() {
       });
 
       if (!result || result.error) {
-        // One message for every kind of miss — see the authorize() comment.
-        setError("Invalid email or password.");
+        setError(messageForSignInCode(result?.code));
         return;
       }
 
@@ -88,6 +103,14 @@ export function LoginForm() {
       </div>
 
       <FormError>{error}</FormError>
+      {params.get("verified") === "1" && !error ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+        >
+          Your email is confirmed. Sign in to continue.
+        </p>
+      ) : null}
       {params.get("reset") === "1" && !error ? (
         <p
           role="status"
