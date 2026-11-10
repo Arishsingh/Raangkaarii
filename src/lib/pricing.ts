@@ -67,6 +67,7 @@ export async function priceCart(
       size: String(raw?.size ?? ""),
       qty,
       price: product.price,
+      image: product.image || undefined,
     });
     subtotal += product.price * qty;
     items += qty;

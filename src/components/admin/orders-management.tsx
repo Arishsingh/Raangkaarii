@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { updateOrderStatusAction } from "@/app/admin/actions";
 import { MoneyBadge } from "@/components/admin/money-badge";
+import { MediaFallback, ProductImage } from "@/components/product-image";
 import { ShipButton } from "@/components/admin/ship-button";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { moneyStateOf } from "@/lib/money-state";
@@ -250,8 +251,15 @@ export function OrdersManagement({ initialOrders }: { initialOrders: StoredOrder
                     </h4>
                     <div className="divide-y divide-border/40 rounded-lg border border-border/50 bg-background">
                       {order.lines.map((line, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 text-xs">
-                          <div>
+                        <div key={idx} className="flex items-center justify-between gap-3 p-3 text-xs">
+                          <div className="relative size-16 shrink-0 overflow-hidden rounded-md border border-border/50">
+                            {line.image ? (
+                              <ProductImage src={line.image} alt={line.name} sizes="64px" />
+                            ) : (
+                              <MediaFallback />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
                             <p className="font-medium text-foreground">{line.name}</p>
                             <p className="text-muted-foreground">
                               Size: <span className="font-semibold">{line.size || "Standard"}</span>{" "}

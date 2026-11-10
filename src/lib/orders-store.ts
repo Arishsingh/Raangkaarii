@@ -19,6 +19,12 @@ export type StoredOrderLine = {
   size: string;
   qty: number;
   price: number;
+  /**
+   * The product's photo at checkout, so the admin panel can show what was
+   * bought. Optional: orders placed before this was recorded have none, and
+   * the admin page fills those in from the catalogue.
+   */
+  image?: string;
 };
 
 /**
