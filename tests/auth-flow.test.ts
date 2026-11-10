@@ -14,7 +14,6 @@ delete process.env.GOOGLE_CLIENT_ID;
 
 const users = new Map<string, Record<string, unknown>>();
 const failures: string[] = [];
-const sendVerificationLink = vi.fn(async () => true);
 
 vi.mock("@auth/neon-adapter", () => ({ default: () => ({}) }));
 vi.mock("@neondatabase/serverless", async (original) => ({
@@ -25,7 +24,6 @@ vi.mock("@/lib/users-store", () => ({
   ensureAuthSchema: async () => {},
   findUserByEmail: async (email: string) => users.get(email.trim().toLowerCase()) ?? null,
 }));
-vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
 vi.mock("@/lib/login-limit", async (original) => ({
   ...(await original<typeof import("@/lib/login-limit")>()),
   loginIsBlocked: async (email: string) =>
@@ -61,7 +59,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   failures.length = 0;
-  sendVerificationLink.mockClear();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -122,14 +119,14 @@ describe("real Auth.js sign-in flow", () => {
     const result = await signInWith("new@example.com", "correct-horse-battery");
     expect(result.error).toBeNull();
     expect((await sessionFor(result.cookie)).user.email).toBe("new@example.com");
-    expect(sendVerificationLink).not.toHaveBeenCalled();
   });
 
-  it("holds an unconfirmed admin account until the emailed link is opened", async () => {
+  it("lets a just-registered admin account straight in, recognised as admin", async () => {
     const result = await signInWith("arishsingh9469@gmail.com", "correct-horse-battery");
-    expect(result.code).toBe("email_unverified");
-    expect(await sessionFor(result.cookie)).toBeNull();
-    expect(sendVerificationLink).toHaveBeenCalledTimes(1);
+    expect(result.error).toBeNull();
+    const session = await sessionFor(result.cookie);
+    const { emailIsAdmin } = await import("@/lib/admin");
+    expect(emailIsAdmin(session.user.email)).toBe(true);
   });
 
   it("locks an address after 5 wrong passwords — even the right one is refused", async () => {

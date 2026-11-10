@@ -10,13 +10,6 @@ vi.mock("@/lib/users-store", () => ({
   normaliseEmail: (email: string) => email.trim().toLowerCase(),
 }));
 
-const sendVerificationLink = vi.fn();
-let emailOn = true;
-vi.mock("@/lib/admin-emails", () => ({
-  emailIsAdmin: (email: string) => ["admin@gmail.com", "owner@example.com"].includes(email),
-}));
-vi.mock("@/lib/email", () => ({ emailConfigured: () => emailOn }));
-vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
 
 const { POST } = await import("@/app/api/register/route");
 
@@ -32,8 +25,6 @@ function register(body: unknown) {
 beforeEach(() => {
   findUserByEmail.mockReset().mockResolvedValue(null);
   createCredentialsUser.mockReset().mockImplementation(async (input) => ({ id: "new", ...input }));
-  sendVerificationLink.mockReset().mockResolvedValue(true);
-  emailOn = true;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -48,35 +39,12 @@ describe("POST /api/register", () => {
     expect(saved.passwordHash).not.toContain("longenough1");
   });
 
-  it("creates a customer account without sending any email", async () => {
-    const res = await register({ email: "a@example.com", password: "longenough1" });
-    expect(await res.json()).toEqual({ ok: true });
-    expect(sendVerificationLink).not.toHaveBeenCalled();
-  });
-
-  it.each(["admin@gmail.com", " Owner@Example.com "])(
-    "lets an admin address (%j) sign up but emails a confirmation link",
-    async (email) => {
+  it("creates the account with no email step, for customers and admins alike", async () => {
+    for (const email of ["a@example.com", "arishsingh9469@gmail.com"]) {
       const res = await register({ email, password: "longenough1" });
-      expect(await res.json()).toEqual({ ok: true, verify: true });
-      expect(createCredentialsUser).toHaveBeenCalled();
-      expect(sendVerificationLink).toHaveBeenCalledWith(
-        expect.objectContaining({ email: email.trim().toLowerCase() }),
-        "http://localhost",
-      );
-    },
-  );
-
-  it("refuses an admin sign-up when email isn't configured (it could never be confirmed)", async () => {
-    emailOn = false;
-    const res = await register({ email: "admin@gmail.com", password: "longenough1" });
-    expect(res.status).toBe(503);
-    expect(createCredentialsUser).not.toHaveBeenCalled();
-  });
-
-  it("still lets customers sign up when email isn't configured", async () => {
-    emailOn = false;
-    expect((await register({ email: "a@example.com", password: "longenough1" })).status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    }
+    expect(createCredentialsUser).toHaveBeenCalledTimes(2);
   });
 
   it("rejects malformed JSON", async () => {

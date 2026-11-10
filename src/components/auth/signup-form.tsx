@@ -35,8 +35,6 @@ export function SignupForm() {
     defaultValues: { email: "", password: "", confirmPassword: "" },
   });
   const [error, setError] = React.useState("");
-  /** Set when an admin-list address must confirm by email before signing in. */
-  const [confirmTo, setConfirmTo] = React.useState("");
 
   /**
    * The same three rules the server applies, run here so the answer is
@@ -60,11 +58,6 @@ export function SignupForm() {
 
       if (!response.ok) {
         setError(body.error ?? "Could not create your account. Please try again.");
-        return;
-      }
-
-      if (body.verify) {
-        setConfirmTo(email.trim());
         return;
       }
 
@@ -92,32 +85,6 @@ export function SignupForm() {
       setError("Something went wrong. Please try again.");
     }
   });
-
-  if (confirmTo) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-serif text-4xl">Confirm your email</h1>
-          <p
-            role="status"
-            className="mt-4 rounded-lg border border-emerald-600/30 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
-          >
-            Email sent to <span className="font-medium">{confirmTo}</span>.
-          </p>
-          <p className="mt-3 text-sm font-light leading-relaxed text-foreground/65">
-            This is an admin address, so it needs a one-time confirmation. Open the
-            link in the email (it works for 24 hours), then sign in. Don&apos;t see
-            it? Check your spam folder.
-          </p>
-        </div>
-        <Button asChild className="h-12 w-full text-base">
-          <Link href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
-            Go to sign in
-          </Link>
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
