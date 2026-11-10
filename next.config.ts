@@ -13,6 +13,14 @@ const CACHE_STATIC_MEDIA = {
 
 const nextConfig: NextConfig = {
   images: {
+    /**
+     * Serve photos as stored instead of through Vercel's image optimiser. On
+     * the Hobby plan its monthly allowance ran out and every optimised request
+     * came back 402 OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED, leaving the
+     * storefront with blank cards. /api/media already sends a year-long
+     * immutable cache header, so the CDN still serves each file once fetched.
+     */
+    unoptimized: true,
     remotePatterns: [
       // Product stills uploaded through the admin panel.
       { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
