@@ -51,6 +51,7 @@ export async function POST(request: Request) {
         minutes: RESET_TOKEN_TTL_MINUTES,
       });
       await sendEmail({ to: issued.email, ...message });
+      console.info("Password reset email sent");
     } catch (caught) {
       console.error("Could not send password reset email", caught);
     }

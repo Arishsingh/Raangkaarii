@@ -62,6 +62,23 @@ describe("POST /api/password/forgot", () => {
     vi.unstubAllEnvs();
   });
 
+  it("sends the email and logs that it did", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    createResetToken.mockResolvedValue({ token: "abc", name: "A", email: "a@example.com" });
+    await post(forgot.POST, { email: "a@example.com" });
+    await pending[0]();
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: "a@example.com" }));
+    expect(info).toHaveBeenCalledWith("Password reset email sent");
+  });
+
+  it("logs a send failure instead of crashing", async () => {
+    createResetToken.mockResolvedValue({ token: "abc", name: null, email: "a@example.com" });
+    sendEmail.mockRejectedValue(new Error("Resend rejected the email (403)"));
+    await post(forgot.POST, { email: "a@example.com" });
+    await expect(pending[0]()).resolves.toBeUndefined();
+    expect(console.error).toHaveBeenCalledWith("Could not send password reset email", expect.any(Error));
+  });
+
   it("rejects an invalid email", async () => {
     expect((await post(forgot.POST, { email: "nope" })).status).toBe(400);
   });

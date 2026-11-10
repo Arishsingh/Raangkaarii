@@ -58,7 +58,13 @@ export async function createResetToken(
 ): Promise<{ token: string; name: string | null; email: string } | null> {
   await ensureResetSchema();
   const user = await findUserByEmail(email);
-  if (!user) return null;
+  // Logged for us only: the visitor always sees the same answer, so without
+  // this a reset that silently sent nothing could not be told apart from one
+  // that was sent. No address is logged, only the reason.
+  if (!user) {
+    console.warn("Password reset skipped: no account with that email");
+    return null;
+  }
 
   const sql = getSql();
   const [recent] = (await sql`
@@ -67,7 +73,10 @@ export async function createResetToken(
      where user_id = ${user.id}
        and created_at > now() - interval '1 hour'
   `) as { n: number }[];
-  if ((recent?.n ?? 0) >= MAX_REQUESTS_PER_HOUR) return null;
+  if ((recent?.n ?? 0) >= MAX_REQUESTS_PER_HOUR) {
+    console.warn(`Password reset skipped: ${MAX_REQUESTS_PER_HOUR} links already sent this hour`);
+    return null;
+  }
 
   const token = crypto.randomBytes(32).toString("base64url");
   await sql`
