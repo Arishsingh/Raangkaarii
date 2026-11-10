@@ -2,9 +2,7 @@ import bcrypt from "bcryptjs";
 
 import { BCRYPT_ROUNDS } from "@/auth";
 import { EMAIL_PATTERN, PASSWORD_MIN_LENGTH } from "@/lib/auth-rules";
-import { emailConfigured } from "@/lib/email";
-import { sendVerificationLink } from "@/lib/email-verification";
-import { siteOrigin } from "@/lib/site-origin";
+import { emailIsAdmin } from "@/lib/admin";
 import {
   createCredentialsUser,
   findUserByEmail,
@@ -16,9 +14,8 @@ import {
  * provider only ever checks an existing password — so this is the one endpoint
  * the app adds around it.
  *
- * No session is minted here. The new account is emailed a confirmation link
- * and cannot sign in until it is opened — admin access is decided by email
- * address, so an address nobody has proven must never sign in.
+ * The browser signs in immediately afterwards through Auth.js itself, so no
+ * session is minted here and no token is handled by hand.
  */
 type Body = {
   name?: string;
@@ -60,10 +57,15 @@ export async function POST(request: Request) {
     return bad("Passwords do not match.");
   }
 
-  // Without email the account could never be confirmed, so do not create it.
-  if (!emailConfigured()) {
-    console.error("Sign-up attempted but RESEND_API_KEY is not set");
-    return bad("Sign-up isn't available right now. Please try again later.", 503);
+  /**
+   * Admin access is decided by email address, and sign-up does not prove the
+   * address belongs to whoever typed it. So an address on the admin list can
+   * never be registered here — otherwise anyone could sign up as an admin
+   * whose account does not exist yet. Admins sign in to their existing
+   * account, or with Google, which does prove the address.
+   */
+  if (emailIsAdmin(email)) {
+    return bad("This email can't be used to create an account. Please sign in instead.", 403);
   }
 
   try {
@@ -97,14 +99,7 @@ export async function POST(request: Request) {
       );
     }
 
-    try {
-      await sendVerificationLink(user, siteOrigin(request));
-    } catch (caught) {
-      // The account exists; signing in with the password sends a fresh link.
-      console.error("Could not send verification email", caught);
-    }
-
-    return Response.json({ ok: true, verify: true });
+    return Response.json({ ok: true });
   } catch (caught) {
     /**
      * The reason is for the server log only. A database error read back to the

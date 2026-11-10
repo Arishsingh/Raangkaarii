@@ -43,21 +43,13 @@ describe("admin access", () => {
     const { getAdminUser } = await import("@/lib/admin");
     authMock.mockResolvedValueOnce(null);
     expect(await getAdminUser()).toBeNull();
-    authMock.mockResolvedValueOnce({ user: { email: "customer@gmail.com", verified: true } });
+    authMock.mockResolvedValueOnce({ user: { email: "customer@gmail.com" } });
     expect(await getAdminUser()).toBeNull();
   });
 
-  it("getAdminUser refuses an admin address whose session is not verified", async () => {
+  it("getAdminUser returns the admin's session user", async () => {
     const { getAdminUser } = await import("@/lib/admin");
-    authMock.mockResolvedValueOnce({ user: { email: "arishsingh9469@gmail.com" } });
-    expect(await getAdminUser()).toBeNull();
-    authMock.mockResolvedValueOnce({ user: { email: "arishsingh9469@gmail.com", verified: false } });
-    expect(await getAdminUser()).toBeNull();
-  });
-
-  it("getAdminUser returns the admin's verified session user", async () => {
-    const { getAdminUser } = await import("@/lib/admin");
-    const user = { id: "u1", email: "arishsingh9469@gmail.com", verified: true };
+    const user = { id: "u1", email: "admin@gmail.com" };
     authMock.mockResolvedValueOnce({ user });
     expect(await getAdminUser()).toEqual(user);
   });

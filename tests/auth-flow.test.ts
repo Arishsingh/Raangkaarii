@@ -14,7 +14,6 @@ delete process.env.GOOGLE_CLIENT_ID;
 
 const users = new Map<string, Record<string, unknown>>();
 const failures: string[] = [];
-const sendVerificationLink = vi.fn(async () => true);
 
 vi.mock("@auth/neon-adapter", () => ({ default: () => ({}) }));
 vi.mock("@neondatabase/serverless", async (original) => ({
@@ -24,7 +23,6 @@ vi.mock("@neondatabase/serverless", async (original) => ({
 vi.mock("@/lib/users-store", () => ({
   ensureAuthSchema: async () => {},
   findUserByEmail: async (email: string) => users.get(email.trim().toLowerCase()) ?? null,
-  claimUnverifiedAccountForGoogle: async () => {},
 }));
 vi.mock("@/lib/login-limit", async (original) => ({
   ...(await original<typeof import("@/lib/login-limit")>()),
@@ -35,7 +33,6 @@ vi.mock("@/lib/login-limit", async (original) => ({
     for (let i = failures.length - 1; i >= 0; i--) if (failures[i] === email) failures.splice(i, 1);
   },
 }));
-vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
 
 let handlers: { GET: (r: Request) => Promise<Response>; POST: (r: Request) => Promise<Response> };
 
@@ -50,15 +47,14 @@ beforeAll(async () => {
     id: "u-new", name: null, email: "new@example.com", image: null,
     password: hash, emailVerified: null,
   });
-  users.set("arishsingh9469@gmail.com", {
-    id: "u-admin", name: "Arish", email: "arishsingh9469@gmail.com", image: null,
+  users.set("admin@gmail.com", {
+    id: "u-admin", name: "Admin", email: "admin@gmail.com", image: null,
     password: hash, emailVerified: new Date(),
   });
 });
 
 beforeEach(() => {
   failures.length = 0;
-  sendVerificationLink.mockClear();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -95,11 +91,11 @@ async function sessionFor(cookie: string) {
 }
 
 describe("real Auth.js sign-in flow", () => {
-  it("signs in a confirmed customer and issues a verified session", async () => {
+  it("signs in a customer and issues a session", async () => {
     const result = await signInWith("asha@example.com", "correct-horse-battery");
     expect(result.error).toBeNull();
     const session = await sessionFor(result.cookie);
-    expect(session.user).toMatchObject({ id: "u-asha", email: "asha@example.com", verified: true });
+    expect(session.user).toMatchObject({ id: "u-asha", email: "asha@example.com" });
   });
 
   it("answers a wrong password with the generic error and no session", async () => {
@@ -115,11 +111,10 @@ describe("real Auth.js sign-in flow", () => {
     expect([unknown.error, unknown.code]).toEqual([wrong.error, wrong.code]);
   });
 
-  it("refuses an unconfirmed account with code email_unverified and sends a link", async () => {
+  it("lets an unconfirmed account straight in — no confirmation email", async () => {
     const result = await signInWith("new@example.com", "correct-horse-battery");
-    expect(result.code).toBe("email_unverified");
-    expect(await sessionFor(result.cookie)).toBeNull();
-    expect(sendVerificationLink).toHaveBeenCalledTimes(1);
+    expect(result.error).toBeNull();
+    expect((await sessionFor(result.cookie)).user.email).toBe("new@example.com");
   });
 
   it("locks an address after 5 wrong passwords — even the right one is refused", async () => {
@@ -137,11 +132,11 @@ describe("real Auth.js sign-in flow", () => {
     expect(failures).not.toContain("asha@example.com");
   });
 
-  it("an admin's fresh session is verified, so the admin check passes", async () => {
-    const result = await signInWith("arishsingh9469@gmail.com", "correct-horse-battery");
+  it("admin@gmail.com signs in with its password and is recognised as admin", async () => {
+    const result = await signInWith("admin@gmail.com", "correct-horse-battery");
+    expect(result.error).toBeNull();
     const session = await sessionFor(result.cookie);
     const { emailIsAdmin } = await import("@/lib/admin");
-    expect(session.user.verified).toBe(true);
     expect(emailIsAdmin(session.user.email)).toBe(true);
   });
 });

@@ -139,27 +139,6 @@ export async function createCredentialsUser(input: {
   return rows[0] ?? null;
 }
 
-/**
- * Called when Google has just proven someone owns this address, before Auth.js
- * links the Google account to an existing user with the same email.
- *
- * A password account nobody ever confirmed may have been registered by someone
- * else, squatting the address. Linking it as-is would hand that person a
- * verified account, so its password is dropped first; the real owner can set
- * one later through "Forgot password". A confirmed account is left alone —
- * its password holder proved the address too.
- */
-export async function claimUnverifiedAccountForGoogle(email: string) {
-  await ensureAuthSchema();
-  const sql = getSql();
-  await sql`
-    update users
-       set password = null, "emailVerified" = now(), updated_at = now()
-     where email = ${normaliseEmail(email)}
-       and "emailVerified" is null
-  `;
-}
-
 export type SiteMember = {
   id: string;
   name: string;

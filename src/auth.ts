@@ -5,19 +5,13 @@ import { Pool } from "@neondatabase/serverless";
 import bcrypt from "bcryptjs";
 
 import { authConfig } from "@/auth.config";
-import { sendVerificationLink } from "@/lib/email-verification";
 import {
   clearLoginFailures,
   clientIp,
   loginIsBlocked,
   recordLoginFailure,
 } from "@/lib/login-limit";
-import { siteOrigin } from "@/lib/site-origin";
-import {
-  claimUnverifiedAccountForGoogle,
-  ensureAuthSchema,
-  findUserByEmail,
-} from "@/lib/users-store";
+import { ensureAuthSchema, findUserByEmail } from "@/lib/users-store";
 
 /**
  * The full Auth.js instance: providers, the Neon adapter, and the password
@@ -37,16 +31,12 @@ export const BCRYPT_ROUNDS = 12;
 const DUMMY_HASH = "$2b$12$2JsDcUYY2w2u5fSUCl4OSOCQczlqvv5hueddf5hKhUdfp1vU0nv7G";
 
 /**
- * Failures the login form words differently. Each `code` lands in the URL, so
- * neither says anything about whether the address is registered: the limit
- * applies to unknown addresses too, and "unverified" is only reported once the
- * right password has been given.
+ * The one failure the login form words differently. Its `code` lands in the
+ * URL; it says nothing about whether the address is registered, because the
+ * limit applies to unknown addresses too.
  */
 export class TooManyAttempts extends CredentialsSignin {
   code = "rate_limited";
-}
-export class EmailNotVerified extends CredentialsSignin {
-  code = "email_unverified";
 }
 
 /**
@@ -58,26 +48,6 @@ export class EmailNotVerified extends CredentialsSignin {
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   ...authConfig,
   adapter: NeonAdapter(new Pool({ connectionString: process.env.DATABASE_URL })),
-  callbacks: {
-    ...authConfig.callbacks,
-    /**
-     * Google sign-ins only with an address Google itself has verified. Before
-     * Auth.js links the Google account to an existing user of the same email,
-     * any password account nobody ever confirmed loses its password — see
-     * claimUnverifiedAccountForGoogle.
-     */
-    async signIn({ account, profile }) {
-      if (account?.provider !== "google") return true;
-      if (profile?.email_verified !== true || !profile.email) return false;
-      try {
-        await claimUnverifiedAccountForGoogle(profile.email);
-        return true;
-      } catch (caught) {
-        console.error("Could not prepare Google sign-in", caught);
-        return false;
-      }
-    },
-  },
   providers: [
     ...authConfig.providers,
     Credentials({
@@ -88,7 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
       /**
        * Returning null means "invalid email or password" and nothing more, so
        * this never reports which half was wrong, or whether the address is
-       * known. The two thrown errors above are the only other answers.
+       * known. TooManyAttempts above is the only other answer.
        */
       async authorize(credentials, request) {
         const email = String(credentials?.email ?? "").trim();
@@ -122,21 +92,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
         await clearLoginFailures(email).catch((caught) =>
           console.error("Could not clear login failures", caught),
         );
-
-        /**
-         * The right password, but the address was never confirmed. Send a
-         * fresh link (rate limited per account) and refuse the sign-in — the
-         * person at the keyboard knows the password, so telling them the
-         * account exists reveals nothing new.
-         */
-        if (!user.emailVerified) {
-          try {
-            await sendVerificationLink(user, siteOrigin(request));
-          } catch (caught) {
-            console.error("Could not send verification email", caught);
-          }
-          throw new EmailNotVerified();
-        }
 
         return {
           id: user.id,

@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findUserByEmail = vi.fn();
 const createCredentialsUser = vi.fn();
-const sendVerificationLink = vi.fn();
-let emailOn = true;
 
 vi.mock("@/auth", () => ({ BCRYPT_ROUNDS: 4 }));
 vi.mock("@/lib/users-store", () => ({
@@ -12,8 +10,9 @@ vi.mock("@/lib/users-store", () => ({
   normaliseEmail: (email: string) => email.trim().toLowerCase(),
 }));
 
-vi.mock("@/lib/email", () => ({ emailConfigured: () => emailOn }));
-vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
+vi.mock("@/lib/admin", () => ({
+  emailIsAdmin: (email: string) => ["admin@gmail.com", "owner@example.com"].includes(email),
+}));
 
 const { POST } = await import("@/app/api/register/route");
 
@@ -29,8 +28,6 @@ function register(body: unknown) {
 beforeEach(() => {
   findUserByEmail.mockReset().mockResolvedValue(null);
   createCredentialsUser.mockReset().mockImplementation(async (input) => ({ id: "new", ...input }));
-  sendVerificationLink.mockReset().mockResolvedValue(true);
-  emailOn = true;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -45,27 +42,19 @@ describe("POST /api/register", () => {
     expect(saved.passwordHash).not.toContain("longenough1");
   });
 
-  it("emails a confirmation link and does not sign anyone in", async () => {
+  it("creates the account without sending any email", async () => {
     const res = await register({ email: "a@example.com", password: "longenough1" });
-    expect(await res.json()).toEqual({ ok: true, verify: true });
-    expect(sendVerificationLink).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "new", email: "a@example.com" }),
-      "http://localhost",
-    );
-    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(await res.json()).toEqual({ ok: true });
   });
 
-  it("still creates the account if the email fails (signing in resends it)", async () => {
-    sendVerificationLink.mockRejectedValue(new Error("Resend down"));
-    expect((await register({ email: "a@example.com", password: "longenough1" })).status).toBe(200);
-  });
-
-  it("refuses to create accounts when email isn't configured", async () => {
-    emailOn = false;
-    const res = await register({ email: "a@example.com", password: "longenough1" });
-    expect(res.status).toBe(503);
-    expect(createCredentialsUser).not.toHaveBeenCalled();
-  });
+  it.each(["admin@gmail.com", " Owner@Example.com "])(
+    "refuses to register an admin address (%j) — admins sign in, never sign up",
+    async (email) => {
+      const res = await register({ email, password: "longenough1" });
+      expect(res.status).toBe(403);
+      expect(createCredentialsUser).not.toHaveBeenCalled();
+    },
+  );
 
   it("rejects malformed JSON", async () => {
     expect((await register("{not json")).status).toBe(400);

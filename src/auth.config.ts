@@ -27,13 +27,12 @@ export const authConfig = {
           clientId: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
           /**
-           * Safe now that every password account must confirm its address:
-           * linking joins two parties who both proved they own the inbox. The
-           * one exception — a password account nobody confirmed, which could
-           * be someone squatting the address — has its password removed by the
-           * signIn callback in src/auth.ts before the link is made.
+           * Left off deliberately. With it, anyone who can get Google to assert
+           * an address could sign in as the password account holding that same
+           * address. Auth.js instead raises OAuthAccountNotLinked, which the
+           * login page turns into a "sign in with your password" message.
            */
-          allowDangerousEmailAccountLinking: true,
+          allowDangerousEmailAccountLinking: false,
         }),
       ]
     : [],
@@ -57,22 +56,11 @@ export const authConfig = {
      * the token alone, so it is copied in once and read back from there.
      */
     jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        /**
-         * Every sign-in that reaches here proved the address: a password
-         * account only signs in once confirmed, and Google sign-in requires
-         * Google's own verification. Sessions issued before this check
-         * existed lack the flag, and so lose admin access until they sign in
-         * again.
-         */
-        token.verified = true;
-      }
+      if (user) token.id = user.id;
       return token;
     },
     session({ session, token }) {
       if (token.id) session.user.id = String(token.id);
-      session.user.verified = token.verified === true;
       return session;
     },
   },

@@ -7,15 +7,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
  * rate limiter and mailer are faked.
  */
 const findUserByEmail = vi.fn();
-const claimUnverifiedAccountForGoogle = vi.fn();
 const loginIsBlocked = vi.fn();
 const recordLoginFailure = vi.fn();
 const clearLoginFailures = vi.fn();
-const sendVerificationLink = vi.fn();
 
 type Config = {
   providers: { id?: string; authorize?: (c: unknown, r?: Request) => Promise<unknown> }[];
-  callbacks: { signIn: (p: unknown) => Promise<boolean> };
 };
 let config: Config;
 
@@ -40,7 +37,6 @@ vi.mock("@neondatabase/serverless", async (original) => ({
 vi.mock("@/lib/users-store", () => ({
   ensureAuthSchema: vi.fn(async () => {}),
   findUserByEmail,
-  claimUnverifiedAccountForGoogle,
 }));
 vi.mock("@/lib/login-limit", async (original) => ({
   ...(await original<typeof import("@/lib/login-limit")>()),
@@ -48,32 +44,26 @@ vi.mock("@/lib/login-limit", async (original) => ({
   recordLoginFailure,
   clearLoginFailures,
 }));
-vi.mock("@/lib/email-verification", () => ({ sendVerificationLink }));
 
 let authorize: (credentials: unknown, request?: Request) => Promise<unknown>;
-let signInCallback: (params: unknown) => Promise<boolean>;
 let passwordHash: string;
 
 beforeAll(async () => {
   await import("@/auth");
   authorize = config.providers.find((p) => p.id === "credentials")!.authorize!;
-  signInCallback = config.callbacks.signIn;
   passwordHash = await bcrypt.hash("correct-horse-battery", 4);
 });
 
 beforeEach(() => {
   for (const mock of [
     findUserByEmail,
-    claimUnverifiedAccountForGoogle,
     loginIsBlocked,
     recordLoginFailure,
     clearLoginFailures,
-    sendVerificationLink,
   ]) mock.mockReset();
   loginIsBlocked.mockResolvedValue(false);
   recordLoginFailure.mockResolvedValue(undefined);
   clearLoginFailures.mockResolvedValue(undefined);
-  sendVerificationLink.mockResolvedValue(true);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -163,70 +153,20 @@ describe("login attempt limit", () => {
   });
 });
 
-describe("email verification", () => {
-  it("refuses an unconfirmed account and emails a fresh link", async () => {
+describe("no email confirmation step", () => {
+  it("lets an account in with the right password even if its email was never confirmed", async () => {
     findUserByEmail.mockResolvedValue(customer({ emailVerified: null }));
-    await expect(login("asha@example.com", "correct-horse-battery")).rejects.toMatchObject({
-      code: "email_unverified",
-    });
-    expect(sendVerificationLink).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "user-1", email: "asha@example.com" }),
-      expect.any(String),
-    );
-  });
-
-  it("does not reveal an unconfirmed account to someone with the wrong password", async () => {
-    findUserByEmail.mockResolvedValue(customer({ emailVerified: null }));
-    expect(await login("asha@example.com", "wrong-password")).toBeNull();
-    expect(sendVerificationLink).not.toHaveBeenCalled();
-  });
-
-  it("still refuses when the email could not be sent", async () => {
-    findUserByEmail.mockResolvedValue(customer({ emailVerified: null }));
-    sendVerificationLink.mockRejectedValue(new Error("Resend down"));
-    await expect(login("asha@example.com", "correct-horse-battery")).rejects.toMatchObject({
-      code: "email_unverified",
-    });
-  });
-});
-
-describe("Google sign-in", () => {
-  const google = (profile: object) =>
-    signInCallback({ account: { provider: "google" }, profile });
-
-  it("lets password sign-ins through untouched", async () => {
-    expect(await signInCallback({ account: { provider: "credentials" } })).toBe(true);
-    expect(claimUnverifiedAccountForGoogle).not.toHaveBeenCalled();
-  });
-
-  it("accepts a Google-verified address and claims any unconfirmed account for it", async () => {
-    expect(await google({ email: "asha@example.com", email_verified: true })).toBe(true);
-    expect(claimUnverifiedAccountForGoogle).toHaveBeenCalledWith("asha@example.com");
-  });
-
-  it("refuses an address Google has not verified", async () => {
-    expect(await google({ email: "asha@example.com", email_verified: false })).toBe(false);
-    expect(await google({ email: "asha@example.com" })).toBe(false);
-    expect(claimUnverifiedAccountForGoogle).not.toHaveBeenCalled();
-  });
-
-  it("refuses when the account could not be prepared", async () => {
-    claimUnverifiedAccountForGoogle.mockRejectedValue(new Error("db down"));
-    expect(await google({ email: "asha@example.com", email_verified: true })).toBe(false);
+    expect(await login("asha@example.com", "correct-horse-battery")).toMatchObject({ id: "user-1" });
   });
 });
 
 describe("session", () => {
-  it("marks fresh sign-ins verified, and old tokens without the flag as not", async () => {
+  it("uses JWT sessions carrying the user id", async () => {
     const { authConfig } = await import("@/auth.config");
     expect(authConfig.session.strategy).toBe("jwt");
-
     const token = authConfig.callbacks.jwt({ token: {}, user: { id: "u1" } } as never);
-    expect(token).toMatchObject({ id: "u1", verified: true });
-
-    const fresh = authConfig.callbacks.session({ session: { user: {} }, token } as never);
-    expect(fresh.user.verified).toBe(true);
-    const old = authConfig.callbacks.session({ session: { user: {} }, token: { id: "u1" } } as never);
-    expect(old.user.verified).toBe(false);
+    expect(token).toMatchObject({ id: "u1" });
+    const session = authConfig.callbacks.session({ session: { user: {} }, token } as never);
+    expect(session.user.id).toBe("u1");
   });
 });
