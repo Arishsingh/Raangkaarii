@@ -3,7 +3,7 @@ import "server-only";
 import { isPriced } from "@/lib/format";
 
 import { getShopProduct } from "@/lib/catalog";
-import { DELIVERY_FEE, FREE_DELIVERY_OVER } from "@/lib/orders";
+import { deliveryFee } from "@/lib/orders";
 import type { StoredOrderLine } from "@/lib/orders-store";
 
 export type CartLineInput = { id?: string; size?: string; qty?: number };
@@ -24,8 +24,8 @@ const MAX_QTY_PER_LINE = 20;
  *
  * Both the Razorpay order and the recorded order are built from this, because
  * the amount charged and the amount stored have to agree. They used to be
- * computed separately, and the charge left out delivery — every order under
- * FREE_DELIVERY_OVER was undercharged by exactly DELIVERY_FEE.
+ * computed separately, and the charge left out delivery, so every order was
+ * undercharged by its delivery fee.
  */
 export async function priceCart(
   input: unknown,
@@ -73,7 +73,7 @@ export async function priceCart(
     items += qty;
   }
 
-  const delivery = subtotal >= FREE_DELIVERY_OVER ? 0 : DELIVERY_FEE;
+  const delivery = deliveryFee(items);
 
   return {
     cart: { lines, items, subtotal, delivery, payable: subtotal + delivery },
