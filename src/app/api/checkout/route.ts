@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const order = await razorpay.orders.create({
       // Razorpay works in the smallest currency unit, so rupees → paise. This
       // is the full payable including delivery; charging the subtotal alone
-      // undercharged every order below the free-delivery threshold.
+      // undercharged every order by its delivery fee.
       amount: cart.payable * 100,
       currency: "INR",
       receipt: receiptId,

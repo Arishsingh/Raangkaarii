@@ -54,15 +54,19 @@ export type Order = {
 
 const STORAGE_KEY = "rangkaarii:orders";
 
-/** Free delivery over this, like most Indian storefronts. */
-export const FREE_DELIVERY_OVER = 5000;
-export const DELIVERY_FEE = 79;
+/** Charged per item, on every order — there is no free-delivery threshold. */
+export const DELIVERY_FEE_PER_ITEM = 120;
+
+/** The delivery charge for a cart holding `itemCount` items in total. */
+export function deliveryFee(itemCount: number) {
+  return Math.max(0, itemCount) * DELIVERY_FEE_PER_ITEM;
+}
 
 /** Everything is shown at a notional 12% off, the way marketplaces list MRP. */
 export function priceBreakdown(subtotal: number, itemCount: number) {
   const listTotal = Math.round(subtotal / 0.88);
   const discount = listTotal - subtotal;
-  const delivery = subtotal >= FREE_DELIVERY_OVER || subtotal === 0 ? 0 : DELIVERY_FEE;
+  const delivery = subtotal === 0 ? 0 : deliveryFee(itemCount);
   return {
     items: itemCount,
     listTotal,
