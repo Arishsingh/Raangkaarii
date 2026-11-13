@@ -329,6 +329,11 @@ export function ShopBoard({
                         </p>
                       )
                     ) : null}
+                    {product.inStock ? null : (
+                      <p className="mt-2 inline-flex w-fit rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                        Out of stock
+                      </p>
+                    )}
                     <div className="mt-auto flex items-center justify-between gap-3 pt-4">
                       {/* Buying needs a size, so this opens the piece's page. */}
                       <Link
@@ -353,8 +358,14 @@ export function ShopBoard({
                         <button
                           type="button"
                           aria-label={`Add ${product.name} to cart`}
-                          disabled={!isPriced(product.price)}
-                          title={isPriced(product.price) ? undefined : PRICE_PENDING_LABEL}
+                          disabled={!isPriced(product.price) || !product.inStock}
+                          title={
+                            !product.inStock
+                              ? "Out of stock"
+                              : isPriced(product.price)
+                                ? undefined
+                                : PRICE_PENDING_LABEL
+                          }
                           onClick={() => {
                             addToCart(product.id, product.sizes[0], product.name);
                           }}

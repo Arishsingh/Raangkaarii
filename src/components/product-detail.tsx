@@ -189,7 +189,9 @@ export function ProductDetail({
             <dt className="text-foreground/55">Occasion</dt>
             <dd>{product.occasion}</dd>
             <dt className="text-foreground/55">Availability</dt>
-            <dd>{product.inStock ? "In stock" : "Made to order"}</dd>
+            <dd className={product.inStock ? undefined : "font-medium text-red-600"}>
+              {product.inStock ? "In stock" : "Out of stock"}
+            </dd>
           </dl>
 
           <div className="mt-7">
@@ -218,10 +220,10 @@ export function ProductDetail({
               onClick={() => {
                 addToCart(product.id, size, `${product.name} (${size})`);
               }}
-              disabled={!priced}
+              disabled={!priced || !product.inStock}
               className="rounded-full px-8"
             >
-              {priced ? "Add to cart" : PRICE_PENDING_LABEL}
+              {!product.inStock ? "Out of stock" : priced ? "Add to cart" : PRICE_PENDING_LABEL}
             </Button>
             <Button
               variant="outline"

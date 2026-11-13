@@ -25,6 +25,8 @@ export function CartView({ products }: { products: Product[] }) {
     [savedLines, products],
   );
 
+  const outOfStock = rows.filter((row) => !row.product.inStock);
+
   const subtotal = rows.reduce(
     (total, row) => total + row.product.price * row.line.qty,
     0,
@@ -119,6 +121,11 @@ export function CartView({ products }: { products: Product[] }) {
                     <p className="mt-1.5 text-sm font-light text-foreground/60">
                       Size {line.size} · {product.fabric}
                     </p>
+                    {product.inStock ? null : (
+                      <p className="mt-2 inline-flex w-fit rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                        Out of stock — remove it to place your order
+                      </p>
+                    )}
                     <p className="mt-3 flex flex-wrap items-baseline gap-2 text-base">
                       <span>
                         ₹{(product.price * line.qty).toLocaleString("en-IN")}
@@ -174,9 +181,15 @@ export function CartView({ products }: { products: Product[] }) {
             <aside className="space-y-4">
               <PricePanel totals={totals} />
               <div className="flex flex-wrap gap-3">
-                <Button asChild className="flex-1 rounded-full">
-                  <Link href="/dashboard/checkout">Place order</Link>
-                </Button>
+                {outOfStock.length > 0 ? (
+                  <Button disabled className="flex-1 rounded-full">
+                    Remove out-of-stock pieces to order
+                  </Button>
+                ) : (
+                  <Button asChild className="flex-1 rounded-full">
+                    <Link href="/dashboard/checkout">Place order</Link>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="rounded-full px-6"

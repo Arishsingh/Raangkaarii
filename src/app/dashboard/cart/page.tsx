@@ -1,3 +1,5 @@
+import { connection } from "next/server";
+
 import { CartProvider } from "@/components/cart-provider";
 import { CartView } from "@/components/cart-view";
 import { SiteFooter } from "@/components/site-footer";
@@ -14,6 +16,10 @@ export default async function CartPage() {
    * panel, so a real product vanished from the cart entirely. The catalogue is
    * read here, on the server, where both halves are visible.
    */
+  // Per request, not at build time: a page prerendered once would carry a
+  // frozen catalogue, and anything added later would read as "no longer
+  // available" — and stock changes would never show.
+  await connection();
   const { products } = await getShopCatalog();
 
   return (
