@@ -14,8 +14,8 @@ import { authConfig } from "@/auth.config";
  */
 const { auth } = NextAuth(authConfig);
 
-/** Browsing and the cart are open; buying, orders and admin need a signed-in visitor. */
-const PROTECTED = ["/dashboard/checkout", "/dashboard/orders", "/admin", "/profile", "/settings"];
+/** Browsing is open; the cart, buying, orders and admin need a signed-in visitor. */
+const PROTECTED = ["/dashboard/cart", "/dashboard/checkout", "/dashboard/orders", "/admin", "/profile", "/settings"];
 
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;

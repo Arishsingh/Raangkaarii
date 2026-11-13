@@ -1,6 +1,6 @@
 import { emailConfigured, passwordResetEmail, sendEmail } from "@/lib/email";
 import { EMAIL_PATTERN } from "@/lib/auth-rules";
-import { createResetToken, RESET_TOKEN_TTL_MINUTES } from "@/lib/password-reset";
+import { createResetToken, discardResetToken, RESET_TOKEN_TTL_MINUTES } from "@/lib/password-reset";
 import { siteOrigin } from "@/lib/site-origin";
 import { normaliseEmail } from "@/lib/users-store";
 
@@ -37,12 +37,14 @@ export async function POST(request: Request) {
     );
   }
 
+  let issuedToken = "";
   try {
     const issued = await createResetToken(email);
     if (issued.status !== "issued") {
       return Response.json({ ok: true, status: issued.status satisfies ForgotStatus });
     }
 
+    issuedToken = issued.token;
     const link = `${siteOrigin(request)}/reset-password?token=${encodeURIComponent(issued.token)}`;
     const message = passwordResetEmail({
       name: issued.name,
@@ -54,6 +56,11 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, status: "sent" satisfies ForgotStatus });
   } catch (caught) {
     console.error("Could not send password reset email", caught);
+    // The email never went out: withdraw the link so it does not use up the
+    // shopper's hourly allowance.
+    await discardResetToken(issuedToken).catch((error) =>
+      console.error("Could not discard unsent reset token", error),
+    );
     return Response.json(
       { error: "We couldn't send the email just now. Please try again in a minute." },
       { status: 502 },

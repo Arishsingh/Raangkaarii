@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const resetPassword = vi.fn();
 const createResetToken = vi.fn();
+const discardResetToken = vi.fn(async () => {});
 const sendEmail = vi.fn();
 const clearLoginFailures = vi.fn(async () => {});
 
@@ -9,6 +10,7 @@ vi.mock("@/auth", () => ({ BCRYPT_ROUNDS: 4 }));
 vi.mock("@/lib/password-reset", () => ({
   resetPassword,
   createResetToken,
+  discardResetToken,
   RESET_TOKEN_TTL_MINUTES: 30,
 }));
 vi.mock("@/lib/email", () => ({
@@ -68,6 +70,8 @@ describe("POST /api/password/forgot", () => {
     expect(res.status).toBe(502);
     expect((await res.json()).error).toMatch(/couldn't send/i);
     expect(console.error).toHaveBeenCalledWith("Could not send password reset email", expect.any(Error));
+    // The unsent link is withdrawn, so it does not count toward the hourly limit.
+    expect(discardResetToken).toHaveBeenCalledWith(issued.token);
   });
 
   it("builds the link from config, not a forged Host header", async () => {

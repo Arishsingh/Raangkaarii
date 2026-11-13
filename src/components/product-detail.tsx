@@ -9,7 +9,7 @@ import { ProductGallery } from "@/components/product-gallery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCart } from "@/components/cart-provider";
+import { useAddToCart } from "@/components/use-add-to-cart";
 import { useWishlist } from "@/components/wishlist-provider";
 import type { Product } from "@/lib/products";
 import {
@@ -55,7 +55,7 @@ export function ProductDetail({
   canModerate?: boolean;
 }) {
   const wishlist = useWishlist();
-  const cart = useCart();
+  const addToCart = useAddToCart();
   const saved = wishlist?.has(product.id) ?? false;
 
   // Only a was-price above what is actually charged is an offer worth showing.
@@ -216,8 +216,7 @@ export function ProductDetail({
           <div className="mt-7 flex flex-wrap gap-3">
             <Button
               onClick={() => {
-                cart?.add(product.id, size);
-                toast.success(`${product.name} (${size}) added to your cart`);
+                addToCart(product.id, size, `${product.name} (${size})`);
               }}
               disabled={!priced}
               className="rounded-full px-8"

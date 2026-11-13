@@ -91,6 +91,17 @@ export async function createResetToken(email: string): Promise<ResetTokenResult>
   return { status: "issued", token, name: user.name, email: user.email };
 }
 
+/**
+ * Withdraws a link whose email never went out, so a failed send neither counts
+ * toward the hourly limit nor leaves a live token nobody received.
+ */
+export async function discardResetToken(token: string) {
+  if (!token) return;
+  await ensureResetSchema();
+  const sql = getSql();
+  await sql`delete from password_reset_tokens where token_hash = ${hashToken(token)}`;
+}
+
 /** Whether a token is still usable, without spending it — for the reset page. */
 export async function resetTokenIsValid(token: string) {
   if (!token) return false;

@@ -4,12 +4,11 @@ import * as React from "react";
 import { ArrowLeft, Heart, Search, ShoppingBag, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 
 import { QuickEdit } from "@/components/admin/quick-edit";
 import { ProductMedia } from "@/components/product-media";
 import { ShopFilters } from "@/components/shop-filters";
-import { useCart } from "@/components/cart-provider";
+import { useAddToCart } from "@/components/use-add-to-cart";
 import { useWishlist } from "@/components/wishlist-provider";
 import {
   MAX_PRICE,
@@ -56,7 +55,7 @@ export function ShopBoard({
   const [tab, setTab] = React.useState("All");
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const wishlist = useWishlist();
-  const cart = useCart();
+  const addToCart = useAddToCart();
   // Stable identity: a fresh [] each render re-ran the product filter every time.
   const loved = React.useMemo(() => wishlist?.items ?? [], [wishlist?.items]);
 
@@ -357,8 +356,7 @@ export function ShopBoard({
                           disabled={!isPriced(product.price)}
                           title={isPriced(product.price) ? undefined : PRICE_PENDING_LABEL}
                           onClick={() => {
-                            cart?.add(product.id, product.sizes[0]);
-                            toast.success(`${product.name} added to your cart`);
+                            addToCart(product.id, product.sizes[0], product.name);
                           }}
                           className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:opacity-30"
                         >

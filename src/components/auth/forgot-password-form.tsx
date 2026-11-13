@@ -30,7 +30,7 @@ export function ForgotPasswordForm() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(body.error ?? "Something went wrong. Please try again.");
+        setError(body.error ?? messageForStatus(response.status));
         return;
       }
       setResult({ email: email.trim(), status: body.status ?? "sent" });
@@ -149,4 +149,15 @@ export function ForgotPasswordForm() {
       </p>
     </div>
   );
+}
+
+/** For when the error body did not survive the trip (a proxy can replace it). */
+function messageForStatus(status: number) {
+  if (status === 503) {
+    return "Password reset by email isn't available right now. Please contact us.";
+  }
+  if (status >= 500) {
+    return "We couldn't send the email just now. Please try again in a minute.";
+  }
+  return "Something went wrong. Please try again.";
 }
