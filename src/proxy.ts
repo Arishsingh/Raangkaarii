@@ -14,8 +14,8 @@ import { authConfig } from "@/auth.config";
  */
 const { auth } = NextAuth(authConfig);
 
-/** Everything under these prefixes requires a signed-in visitor. */
-const PROTECTED = ["/dashboard", "/admin", "/profile", "/settings"];
+/** Browsing and the cart are open; buying, orders and admin need a signed-in visitor. */
+const PROTECTED = ["/dashboard/checkout", "/dashboard/orders", "/admin", "/profile", "/settings"];
 
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;
@@ -31,7 +31,9 @@ export default auth((request) => {
    * URL here would let a crafted link bounce someone off-site afterwards.
    */
   const login = new URL("/login", request.nextUrl);
-  login.searchParams.set("callbackUrl", `${pathname}${search}`);
+  // Checkout sends people back to the cart after signing in, to place the order.
+  const returnTo = pathname === "/dashboard/checkout" ? "/dashboard/cart" : `${pathname}${search}`;
+  login.searchParams.set("callbackUrl", returnTo);
   return NextResponse.redirect(login);
 });
 

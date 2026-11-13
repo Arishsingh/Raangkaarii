@@ -130,11 +130,11 @@ export function Hero() {
           </p>
           {/* The home page only renders for signed-out visitors. */}
           <Link
-            href="/login"
+            href="/dashboard"
             draggable={false}
             className="bg-white/95 px-8 py-3.5 text-xs font-medium tracking-[0.18em] text-neutral-900 shadow-sm transition-colors hover:bg-white"
           >
-            SIGN IN
+            SHOP NOW
           </Link>
         </motion.div>
       </motion.div>

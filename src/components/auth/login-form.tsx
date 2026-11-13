@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 
@@ -48,7 +48,6 @@ function messageForSignInCode(code: string | undefined) {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = safeCallbackUrl(params.get("callbackUrl"));
 
@@ -81,9 +80,9 @@ export function LoginForm() {
         return;
       }
 
-      // refresh() so the server components re-render with the new session.
-      router.replace(callbackUrl);
-      router.refresh();
+      // One full navigation: it carries the new session cookie and avoids the
+      // replace()+refresh() race that re-rendered /login in a redirect loop.
+      window.location.assign(callbackUrl);
     } catch (caught) {
       console.error("Sign in failed", caught);
       setError("Something went wrong. Please try again.");

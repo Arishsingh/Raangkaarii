@@ -1,6 +1,3 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-
 import { CartProvider } from "@/components/cart-provider";
 import { CartView } from "@/components/cart-view";
 import { SiteFooter } from "@/components/site-footer";
@@ -11,9 +8,6 @@ import { getShopCatalog } from "@/lib/catalog";
 export const metadata = { title: "Your cart — Rangkaarii" };
 
 export default async function CartPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-
   /**
    * The cart holds ids only, and the browser cannot resolve them: the built-in
    * list it used to search knows nothing about anything added through the admin

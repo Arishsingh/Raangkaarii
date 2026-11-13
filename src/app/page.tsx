@@ -27,9 +27,9 @@ export default async function Home() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <MostViral products={showcase.viral} signedIn={false} />
+        <MostViral products={showcase.viral} signedIn />
         <ProductRail />
-        <MostLoved products={showcase.loved} signedIn={false} />
+        <MostLoved products={showcase.loved} signedIn />
         <FeatureVideos />
         <CraftStory />
         <HappyCustomers feedback={showcase.feedback} />

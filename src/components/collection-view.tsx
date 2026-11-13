@@ -21,6 +21,7 @@ import {
   type SortOption,
 } from "@/lib/collections";
 import { cn } from "@/lib/utils";
+import { rupees } from "@/lib/format";
 
 type Selections = Record<string, string[]>;
 
@@ -179,18 +180,15 @@ export function CollectionView({ collection }: { collection: Collection }) {
   );
 }
 
-/** Shown in place of every price on the pages a signed-out visitor can reach. */
-const PRICE_PROMPT = "Sign in to view price";
 
-/** Where a signed-out visitor lands when they tap a product. */
-const SIGN_IN_HREF = "/login";
+
 
 function ProductCard({ product }: { product: Product }) {
   return (
     <article>
       {/* Nothing about a piece — its price, its detail page, its cart — is
           public, so the whole card is a way in to signing in. */}
-      <Link href={SIGN_IN_HREF} className="group block">
+      <Link href={`/dashboard/product/${product.id}`} className="group block">
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           <ProductMedia
             image={product.image}
@@ -234,9 +232,8 @@ function ProductCard({ product }: { product: Product }) {
         <div className="mt-3 flex items-start justify-between gap-3">
           <div>
             <h3 className="font-serif text-base leading-snug">{product.name}</h3>
-            {/* Prices are for signed-in customers only; see PRICE_PROMPT. */}
-            <p className="mt-2 text-sm font-light text-foreground/60">
-              {PRICE_PROMPT}
+                        <p className="mt-2 text-sm font-light text-foreground/60">
+              {rupees(product.price)}
             </p>
           </div>
           <span

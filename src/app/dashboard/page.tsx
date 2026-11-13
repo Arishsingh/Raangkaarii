@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
 import { ShopBoard } from "@/components/shop-board";
@@ -21,7 +20,6 @@ export const metadata = { title: "Your account — Rangkaarii" };
 
 export default async function DashboardPage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
 
   const [{ products, filterGroups, maxPrice }, admin, showcase] = await Promise.all([
     getShopCatalog(),
@@ -41,7 +39,7 @@ export default async function DashboardPage() {
           <ShopBoard
             // Remount when the ceiling moves so the slider is never stale.
             key={maxPrice}
-            name={firstNameOf(session.user)}
+            name={session?.user ? firstNameOf(session.user) : undefined}
             products={products}
             filterGroups={filterGroups}
             maxPrice={maxPrice}

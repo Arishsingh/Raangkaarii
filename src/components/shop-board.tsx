@@ -39,7 +39,7 @@ export function ShopBoard({
   maxPrice = MAX_PRICE,
   editableIds = [],
 }: {
-  name: string;
+  name?: string;
   products?: Product[];
   filterGroups?: FilterGroup[];
   /** Ceiling of the price slider; derived from the catalogue, never fixed. */
@@ -221,7 +221,7 @@ export function ShopBoard({
       {/* Greeting stays to one line: the collection is the landing view. */}
       <div className="mt-6 flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-serif text-2xl sm:text-3xl">
-          Welcome back, {name}
+          {name ? `Welcome back, ${name}` : "Shop all"}
         </h1>
 
       </div>

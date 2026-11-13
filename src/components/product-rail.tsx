@@ -207,9 +207,8 @@ export function ProductRail() {
           className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-5 pb-2 sm:-mx-8 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {tabs[active].products.map((product) => (
-            // A product is only shoppable once signed in, so that is where a
-            // card leads; the header nav still reaches the collections.
-            <ProductCard key={product.name} product={product} href="/login" />
+            // Cards lead into the shop; login is only asked for at checkout.
+            <ProductCard key={product.name} product={product} href="/dashboard" />
           ))}
         </div>
       </div>
@@ -259,9 +258,8 @@ function ProductCard({ product, href }: { product: Product; href: string }) {
         </div>
 
         <h3 className="mt-4 font-serif text-base leading-snug">{product.name}</h3>
-        {/* Signed-out visitors do not see prices anywhere on the public site. */}
         <p className="mt-1.5 text-sm font-light text-foreground/60">
-          Sign in to view price
+          {product.price}
         </p>
       </Link>
     </article>

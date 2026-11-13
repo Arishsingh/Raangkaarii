@@ -78,8 +78,7 @@ export function SignupForm() {
         return;
       }
 
-      router.replace(callbackUrl);
-      router.refresh();
+      window.location.assign(callbackUrl);
     } catch (caught) {
       console.error("Sign up failed", caught);
       setError("Something went wrong. Please try again.");
