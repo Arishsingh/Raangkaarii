@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authConfig } from "@/auth.config";
+import { loginRedirectFor } from "@/lib/auth-redirect";
 
 /**
  * Route protection, done from the session cookie alone — this instance is
@@ -14,34 +15,18 @@ import { authConfig } from "@/auth.config";
  */
 const { auth } = NextAuth(authConfig);
 
-/** Browsing is open; the cart, buying, orders and admin need a signed-in visitor. */
-const PROTECTED = ["/dashboard/cart", "/dashboard/checkout", "/dashboard/orders", "/admin", "/profile", "/settings"];
-
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;
-
-  const isProtected = PROTECTED.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-  if (!isProtected || request.auth) return NextResponse.next();
-
-  /**
-   * Where they were headed, carried through the sign-in so they land on it
-   * rather than on the dashboard. Only the path and query are kept — a full
-   * URL here would let a crafted link bounce someone off-site afterwards.
-   */
-  const login = new URL("/login", request.nextUrl);
-  // Checkout sends people back to the cart after signing in, to place the order.
-  const returnTo = pathname === "/dashboard/checkout" ? "/dashboard/cart" : `${pathname}${search}`;
-  login.searchParams.set("callbackUrl", returnTo);
-  return NextResponse.redirect(login);
+  const target = loginRedirectFor(pathname, search, Boolean(request.auth));
+  if (!target) return NextResponse.next();
+  return NextResponse.redirect(new URL(target, request.nextUrl));
 });
 
 export const config = {
   /**
    * Static assets and Next's own routes are excluded; `/api/auth/*` in
    * particular must stay open, or signing in would require being signed in.
-   * `/login` and `/signup` are public by virtue of not being in PROTECTED.
+   * `/login` and `/signup` are public: see PROTECTED_PREFIXES in lib/auth-redirect.
    *
    * `/api/admin/upload` is excluded for a different reason: when a proxy runs,
    * Next buffers the whole request body in memory so it can be read twice, and

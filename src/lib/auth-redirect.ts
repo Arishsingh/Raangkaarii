@@ -26,3 +26,32 @@ export function safeCallbackUrl(value: string | null | undefined) {
 
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
+
+/**
+ * Pages a guest cannot open. Browsing, product pages and the cart are open to
+ * everyone; sign-in is asked for when they go to place the order.
+ */
+export const PROTECTED_PREFIXES = [
+  "/dashboard/checkout",
+  "/dashboard/orders",
+  "/admin",
+  "/profile",
+  "/settings",
+];
+
+export function isProtectedPath(pathname: string) {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+/**
+ * Where to send a request, or null to let it through. A guest heading for a
+ * protected page goes to sign in, carrying where they were headed so they land
+ * on it afterwards: "Place order" comes back to checkout. Only path and query
+ * are carried; a full URL would let a crafted link bounce someone off-site.
+ */
+export function loginRedirectFor(pathname: string, search: string, signedIn: boolean) {
+  if (signedIn || !isProtectedPath(pathname)) return null;
+  return `/login?callbackUrl=${encodeURIComponent(`${pathname}${search}`)}`;
+}

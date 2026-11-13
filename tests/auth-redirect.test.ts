@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_REDIRECT, safeCallbackUrl } from "@/lib/auth-redirect";
+import { DEFAULT_REDIRECT, loginRedirectFor, safeCallbackUrl } from "@/lib/auth-redirect";
 
 /** Where a browser would actually go if handed this value on our own site. */
 function landsOn(value: string) {
@@ -38,4 +38,44 @@ describe("safeCallbackUrl", () => {
       expect(landsOn(safeCallbackUrl(value))).toBe("https://www.rangkaarii.in");
     },
   );
+});
+
+describe("loginRedirectFor", () => {
+  it.each(["/", "/dashboard", "/dashboard/product/p1", "/dashboard/cart", "/collections/new-in", "/login", "/signup"])(
+    "lets a guest browse %s",
+    (path) => {
+      expect(loginRedirectFor(path, "", false)).toBeNull();
+    },
+  );
+
+  it("sends a guest who presses Place order to sign in, then back to checkout", () => {
+    const target = loginRedirectFor("/dashboard/checkout", "", false);
+    expect(target).toBe("/login?callbackUrl=%2Fdashboard%2Fcheckout");
+    // The login page resolves that value to checkout, not the dashboard.
+    const callback = new URL(target!, "https://rangkaarii.in").searchParams.get("callbackUrl");
+    expect(safeCallbackUrl(callback)).toBe("/dashboard/checkout");
+  });
+
+  it("keeps the query string of the page they were heading to", () => {
+    expect(loginRedirectFor("/dashboard/orders/42", "?paid=1", false)).toBe(
+      "/login?callbackUrl=%2Fdashboard%2Forders%2F42%3Fpaid%3D1",
+    );
+  });
+
+  it.each(["/dashboard/orders", "/admin", "/admin/products", "/profile", "/settings"])(
+    "asks a guest to sign in for %s",
+    (path) => {
+      expect(loginRedirectFor(path, "", false)).toMatch(/^\/login\?callbackUrl=/);
+    },
+  );
+
+  it("does not match lookalike paths", () => {
+    expect(loginRedirectFor("/administrator", "", false)).toBeNull();
+    expect(loginRedirectFor("/dashboard/checkouts-info", "", false)).toBeNull();
+  });
+
+  it("lets a signed-in shopper straight through", () => {
+    expect(loginRedirectFor("/dashboard/checkout", "", true)).toBeNull();
+    expect(loginRedirectFor("/admin", "", true)).toBeNull();
+  });
 });

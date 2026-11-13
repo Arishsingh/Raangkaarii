@@ -13,7 +13,8 @@ export const metadata = { title: "Checkout — Rangkaarii" };
 
 export default async function CheckoutPage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  // The proxy normally catches this first; back to checkout after signing in.
+  if (!session?.user) redirect("/login?callbackUrl=%2Fdashboard%2Fcheckout");
 
   // Same reason as the cart: only the server can see the whole catalogue.
   const { products } = await getShopCatalog();
