@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "(test -f .next/BUILD_ID || next build) && next start",
+    "build": "next build --webpack",
+    "start": "(test -f .next/BUILD_ID || next build --webpack) && next start",
     "lint": "eslint",
     "test": "vitest run"
   },
