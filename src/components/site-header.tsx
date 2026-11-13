@@ -371,10 +371,20 @@ export function SiteHeader({
                 !solid && "text-white hover:bg-white/15 hover:text-white",
               )}
             >
-              <Link href="/login" aria-label="Login">
-                <User className="size-5" />
-                <span className="hidden text-sm font-light sm:inline">Login</span>
-              </Link>
+              {/* Storefront pages send guests into the shop; sign-in is asked
+                  for at the first add-to-cart. Inside the shop, returning
+                  customers still get a way to sign in. */}
+              {locked ? (
+                <Link href="/login" aria-label="Login">
+                  <User className="size-5" />
+                  <span className="hidden text-sm font-light sm:inline">Login</span>
+                </Link>
+              ) : (
+                <Link href="/dashboard" aria-label="Shop now">
+                  <ShoppingBag className="size-5" />
+                  <span className="hidden text-sm font-light sm:inline">Shop now</span>
+                </Link>
+              )}
             </Button>
           )}
         </div>
