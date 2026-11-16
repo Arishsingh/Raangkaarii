@@ -10,7 +10,7 @@ import {
   loginIsBlocked,
   recordLoginFailure,
 } from "@/lib/login-limit";
-import { getMongoClient, MONGODB_DB } from "@/lib/mongo";
+import { getMongoClient, isMongoConfigured, MONGODB_DB } from "@/lib/mongo";
 import { ensureAuthSchema, findUserByEmail } from "@/lib/users-store";
 
 /**
@@ -45,9 +45,23 @@ export class TooManyAttempts extends CredentialsSignin {
  * `next build` never evaluates MONGODB_URI at module scope. The client itself
  * is a shared singleton (see lib/mongo.ts), not one connection per request.
  */
+function mongoClientOrFailure() {
+  if (isMongoConfigured()) return getMongoClient();
+  const failed = Promise.reject(new Error("MONGODB_URI is not set.")) as ReturnType<typeof getMongoClient>;
+  failed.catch(() => {});
+  return failed;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   ...authConfig,
-  adapter: MongoDBAdapter(getMongoClient(), { databaseName: MONGODB_DB }),
+  /**
+   * With JWT sessions the adapter is only touched when an account is created
+   * or linked, so a guest browsing the shop must never need Mongo. If the URI
+   * is missing, hand the adapter a promise that rejects when used (and is
+   * already handled, so it never becomes an unhandled rejection) instead of
+   * throwing here, which would take down every page that calls auth().
+   */
+  adapter: MongoDBAdapter(mongoClientOrFailure(), { databaseName: MONGODB_DB }),
   providers: [
     ...authConfig.providers,
     Credentials({
