@@ -3,6 +3,8 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 
+import { invalidateReads } from "@/lib/db";
+
 import { getAdminUser } from "@/lib/admin";
 import {
   addFeedback,
@@ -19,6 +21,7 @@ async function assertAdmin() {
 }
 
 function revalidateShowcase() {
+  invalidateReads();
   revalidatePath("/");
   revalidatePath("/dashboard");
   revalidatePath("/admin/showcase");

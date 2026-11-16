@@ -353,9 +353,17 @@ export function SiteHeader({
                     // item can say what is happening instead of vanishing.
                     event.preventDefault();
                     setSigningOut(true);
-                    // Auth.js clears the cookie and navigates; nothing here
-                    // touches the token itself.
-                    void signOut({ callbackUrl: "/" });
+                    // Clear the cookie, then navigate ourselves. Letting
+                    // Auth.js redirect makes it refetch the session first,
+                    // an extra round trip before the page even starts.
+                    // Never leave the menu stuck on "Signing out…": go home
+                    // as soon as the request finishes, or after 1.5s regardless.
+                    void Promise.race([
+                      signOut({ redirect: false }).catch(() => undefined),
+                      new Promise((resolve) => setTimeout(resolve, 1500)),
+                    ]).finally(() => {
+                      window.location.assign("/");
+                    });
                   }}
                 >
                   {signingOut ? "Signing out…" : "Logout"}

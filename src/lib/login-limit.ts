@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSql } from "@/lib/db";
+import { getMongoDb } from "@/lib/mongo";
 
 /**
  * Throttles password guessing.
@@ -24,23 +24,23 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema() {
   if (!schemaReady) {
     schemaReady = (async () => {
-      const sql = getSql();
-      await sql`
-        create table if not exists login_failures (
-          key        text not null,
-          created_at timestamptz not null default now()
-        )
-      `;
-      await sql`
-        create index if not exists login_failures_key_idx
-          on login_failures (key, created_at)
-      `;
+      const failures = (await getMongoDb()).collection("login_failures");
+      await Promise.all([
+        failures.createIndex({ key: 1, createdAt: 1 }),
+        // Old rows count toward nothing; Mongo trims them after a day.
+        failures.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 }),
+      ]);
     })().catch((error) => {
       schemaReady = null;
       throw error;
     });
   }
   return schemaReady;
+}
+
+async function failuresCollection() {
+  await ensureSchema();
+  return (await getMongoDb()).collection("login_failures");
 }
 
 const emailKey = (email: string) => `email:${email.trim().toLowerCase()}`;
@@ -57,32 +57,26 @@ export function clientIp(request: Request | undefined) {
 }
 
 export async function loginIsBlocked(email: string, ip: string) {
-  await ensureSchema();
-  const sql = getSql();
-  const [row] = (await sql`
-    select
-      count(*) filter (where key = ${emailKey(email)})::int as by_email,
-      count(*) filter (where key = ${ipKey(ip)})::int       as by_ip
-      from login_failures
-     where key in (${emailKey(email)}, ${ipKey(ip)})
-       and created_at > now() - make_interval(mins => ${LOGIN_WINDOW_MINUTES})
-  `) as { by_email: number; by_ip: number }[];
-  return (row?.by_email ?? 0) >= MAX_FAILURES_PER_EMAIL || (row?.by_ip ?? 0) >= MAX_FAILURES_PER_IP;
+  const failures = await failuresCollection();
+  const since = new Date(Date.now() - LOGIN_WINDOW_MINUTES * 60 * 1000);
+  const [byEmail, byIp] = await Promise.all([
+    failures.countDocuments({ key: emailKey(email), createdAt: { $gt: since } }),
+    failures.countDocuments({ key: ipKey(ip), createdAt: { $gt: since } }),
+  ]);
+  return byEmail >= MAX_FAILURES_PER_EMAIL || byIp >= MAX_FAILURES_PER_IP;
 }
 
 export async function recordLoginFailure(email: string, ip: string) {
-  await ensureSchema();
-  const sql = getSql();
-  await sql`
-    insert into login_failures (key) values (${emailKey(email)}), (${ipKey(ip)})
-  `;
-  // Old rows only ever count toward nothing; trim them as we go.
-  await sql`delete from login_failures where created_at < now() - interval '1 day'`;
+  const failures = await failuresCollection();
+  const createdAt = new Date();
+  await failures.insertMany([
+    { key: emailKey(email), createdAt },
+    { key: ipKey(ip), createdAt },
+  ]);
 }
 
 /** A correct password clears that address's count, not the IP's. */
 export async function clearLoginFailures(email: string) {
-  await ensureSchema();
-  const sql = getSql();
-  await sql`delete from login_failures where key = ${emailKey(email)}`;
+  const failures = await failuresCollection();
+  await failures.deleteMany({ key: emailKey(email) });
 }

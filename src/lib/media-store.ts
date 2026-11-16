@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { getSql, isDatabaseConfigured } from "@/lib/db";
+import { getSql, isDatabaseConfigured, logDbError } from "@/lib/db";
 
 /**
  * Product media, kept in Postgres.
@@ -204,7 +204,7 @@ export async function getMediaUsage() {
     `) as { count: number; bytes: string | number }[];
     return { count: row?.count ?? 0, bytes: Number(row?.bytes ?? 0) };
   } catch (caught) {
-    console.error("Could not read media usage", caught);
+    logDbError("Could not read media usage", caught);
     return { count: 0, bytes: 0 };
   }
 }

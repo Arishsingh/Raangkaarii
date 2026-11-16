@@ -26,7 +26,24 @@ import { neon, neonConfig } from "@neondatabase/serverless";
 const ATTEMPT_TIMEOUT_MS = 6_000;
 const ATTEMPTS = 3;
 
+/**
+ * When Neon answers 402 (plan quota exceeded) it will keep answering 402 for
+ * every query until the plan is upgraded. A page makes several queries, each a
+ * network round trip to be refused, which is most of why the site crawls in
+ * that state. Remember the refusal for a short while and fail the next queries
+ * instantly, with the same error, instead of asking again.
+ */
+const QUOTA_BACKOFF_MS = 30_000;
+let quotaRefusedUntil = 0;
+
+function quotaError() {
+  return new Error(
+    "Server error (HTTP status 402): Your account or project has exceeded the quota. Upgrade your plan to increase limits.",
+  );
+}
+
 async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit) {
+  if (Date.now() < quotaRefusedUntil) throw quotaError();
   let lastError: unknown;
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
@@ -52,6 +69,8 @@ async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit) {
     try {
       const response = await fetch(input, { ...init, signal });
       clearTimeout(timer);
+      if (response.status === 402) quotaRefusedUntil = Date.now() + QUOTA_BACKOFF_MS;
+      else quotaRefusedUntil = 0;
       return response;
     } catch (error) {
       clearTimeout(timer);
@@ -141,6 +160,23 @@ async function loadLastGood<T>(key: string): Promise<T | undefined> {
 }
 
 /**
+ * Fresh-copy cache in front of the reads above. Without it every page view
+ * pays a database round trip (0.4–2s on a slow link) for data that changes
+ * only when the admin saves something.
+ *
+ * Stale-while-revalidate: within FRESH_MS the stored copy is returned with no
+ * query; after that it is still returned immediately while one background
+ * refresh runs. Admin writes call `invalidateReads()` so edits show at once.
+ */
+const FRESH_MS = 30_000;
+const fresh = new Map<string, { value: unknown; at: number }>();
+const refreshing = new Set<string>();
+
+export function invalidateReads() {
+  fresh.clear();
+}
+
+/**
  * Runs a read; on success remembers it, on failure falls back to the last
  * good copy, and only when there is none does it log and return `empty`.
  */
@@ -150,17 +186,77 @@ export async function readWithFallback<T>(
   empty: T,
   label: string,
 ): Promise<T> {
-  try {
-    const value = await read();
-    void saveLastGood(key, value);
-    return value;
-  } catch (error) {
-    const saved = await loadLastGood<T>(key);
-    if (saved !== undefined) {
-      console.warn(`${label}: database unreachable, showing the last copy that loaded.`);
-      return saved;
+  const run = async (): Promise<T> => {
+    try {
+      const value = await read();
+      fresh.set(key, { value, at: Date.now() });
+      void saveLastGood(key, value);
+      return value;
+    } catch (error) {
+      const saved = await loadLastGood<T>(key);
+      if (saved !== undefined) {
+        // Serve the fallback for a few seconds before retrying, so a dead
+        // database costs one failed attempt per window, not one per request.
+        fresh.set(key, { value: saved, at: Date.now() - FRESH_MS + 10_000 });
+        console.warn(`${label}: database unreachable, showing the last copy that loaded.`);
+        return saved;
+      }
+      // Nothing saved to fall back on: remember the empty answer briefly so a
+      // page's many reads do not each pay for a failed round trip.
+      fresh.set(key, { value: empty, at: Date.now() - FRESH_MS + 10_000 });
+      if (isQuotaError(error)) {
+        // Expected while the plan is over its limit; the admin panel explains
+        // it. A warning keeps it out of the browser's error overlay.
+        console.warn(`${label}: database over its plan quota (upgrade needed).`);
+      } else {
+        console.error(label, error);
+      }
+      return empty;
     }
-    console.error(label, error);
-    return empty;
+  };
+
+  const hit = fresh.get(key);
+  if (hit) {
+    if (Date.now() - hit.at > FRESH_MS && !refreshing.has(key)) {
+      refreshing.add(key);
+      void run().finally(() => refreshing.delete(key));
+    }
+    return hit.value as T;
   }
+  return run();
+}
+
+/**
+ * Is the database usable right now? Used by the admin panel to say so plainly
+ * instead of failing with a stack trace.
+ *
+ * "quota" is Neon refusing every query with HTTP 402 because the project went
+ * over its plan's limits — the data is still there, but nothing can read or
+ * write it until the plan is upgraded.
+ */
+export type DatabaseStatus = "ok" | "quota" | "down";
+
+export function isQuotaError(error: unknown) {
+  const text = error instanceof Error ? `${error.message} ${String((error as { status?: unknown }).status ?? "")}` : String(error);
+  return /exceeded the quota|HTTP status 402|\b402\b/i.test(text);
+}
+
+let statusCache: { status: DatabaseStatus; at: number } | null = null;
+
+export async function getDatabaseStatus(): Promise<DatabaseStatus> {
+  if (statusCache && Date.now() - statusCache.at < 30_000) return statusCache.status;
+  let status: DatabaseStatus = "ok";
+  try {
+    await getSql()`select 1`;
+  } catch (error) {
+    status = isQuotaError(error) ? "quota" : "down";
+  }
+  statusCache = { status, at: Date.now() };
+  return status;
+}
+
+/** Logs a failed read; a quota refusal is a one-line warning, anything else a full error. */
+export function logDbError(label: string, error: unknown) {
+  if (isQuotaError(error)) console.warn(`${label}: database over its plan quota (upgrade needed).`);
+  else console.error(label, error);
 }

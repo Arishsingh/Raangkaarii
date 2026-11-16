@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { invalidateReads } from "@/lib/db";
+
 import { getAdminUser } from "@/lib/admin";
 import {
   adminProductIdExists,
@@ -53,6 +55,7 @@ async function uniqueId(name: string) {
 }
 
 function revalidateStorefront(collections: string[]) {
+  invalidateReads();
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   for (const slug of collections) revalidatePath(`/collections/${slug}`);

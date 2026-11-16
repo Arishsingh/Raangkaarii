@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSql, isDatabaseConfigured } from "@/lib/db";
+import { getSql, isDatabaseConfigured, logDbError } from "@/lib/db";
 
 /** Where the parcel goes. Needed before a courier shipment can be booked. */
 export type StoredAddress = {
@@ -496,7 +496,7 @@ export async function getRevenueStats(days = 14): Promise<RevenueStats> {
       error: null,
     };
   } catch (caught) {
-    console.error("Could not load revenue", caught);
+    logDbError("Could not load revenue", caught);
     return { ...EMPTY, error: "Could not read orders from the database." };
   }
 }
@@ -528,7 +528,7 @@ export async function listAllOrders(): Promise<StoredOrder[]> {
     `) as OrderRow[];
     return rows.map(toOrder);
   } catch (caught) {
-    console.error("Could not list orders", caught);
+    logDbError("Could not list orders", caught);
     return [];
   }
 }
@@ -547,7 +547,7 @@ export async function listRazorpayTransactions(): Promise<StoredOrder[]> {
     `) as OrderRow[];
     return rows.map(toOrder);
   } catch (caught) {
-    console.error("Could not list Razorpay transactions", caught);
+    logDbError("Could not list Razorpay transactions", caught);
     return [];
   }
 }
@@ -656,7 +656,7 @@ export async function getOrder(orderId: string): Promise<StoredOrder | null> {
     `) as OrderRow[];
     return rows[0] ? toOrder(rows[0]) : null;
   } catch (caught) {
-    console.error("Could not load the order", caught);
+    logDbError("Could not load the order", caught);
     return null;
   }
 }

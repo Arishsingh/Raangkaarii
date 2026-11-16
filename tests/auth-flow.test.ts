@@ -15,10 +15,10 @@ delete process.env.GOOGLE_CLIENT_ID;
 const users = new Map<string, Record<string, unknown>>();
 const failures: string[] = [];
 
-vi.mock("@auth/neon-adapter", () => ({ default: () => ({}) }));
-vi.mock("@neondatabase/serverless", async (original) => ({
-  ...(await original<object>()),
-  Pool: class {},
+vi.mock("@auth/mongodb-adapter", () => ({ MongoDBAdapter: () => ({}) }));
+vi.mock("@/lib/mongo", () => ({
+  getMongoClient: async () => ({}),
+  MONGODB_DB: "test",
 }));
 vi.mock("@/lib/users-store", () => ({
   ensureAuthSchema: async () => {},

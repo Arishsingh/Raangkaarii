@@ -29,10 +29,10 @@ vi.mock("next-auth/providers/credentials", () => ({
   default: (options: object) => ({ id: "credentials", ...options }),
 }));
 vi.mock("next-auth/providers/google", () => ({ default: () => ({ id: "google" }) }));
-vi.mock("@auth/neon-adapter", () => ({ default: () => ({}) }));
-vi.mock("@neondatabase/serverless", async (original) => ({
-  ...(await original<object>()),
-  Pool: class {},
+vi.mock("@auth/mongodb-adapter", () => ({ MongoDBAdapter: () => ({}) }));
+vi.mock("@/lib/mongo", () => ({
+  getMongoClient: async () => ({}),
+  MONGODB_DB: "test",
 }));
 vi.mock("@/lib/users-store", () => ({
   ensureAuthSchema: vi.fn(async () => {}),
