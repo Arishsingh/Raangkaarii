@@ -18,6 +18,7 @@ const failures: string[] = [];
 vi.mock("@auth/mongodb-adapter", () => ({ MongoDBAdapter: () => ({}) }));
 vi.mock("@/lib/mongo", () => ({
   getMongoClient: async () => ({}),
+  isMongoConfigured: () => true,
   MONGODB_DB: "test",
 }));
 vi.mock("@/lib/users-store", () => ({

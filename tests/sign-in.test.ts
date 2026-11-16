@@ -32,6 +32,7 @@ vi.mock("next-auth/providers/google", () => ({ default: () => ({ id: "google" })
 vi.mock("@auth/mongodb-adapter", () => ({ MongoDBAdapter: () => ({}) }));
 vi.mock("@/lib/mongo", () => ({
   getMongoClient: async () => ({}),
+  isMongoConfigured: () => true,
   MONGODB_DB: "test",
 }));
 vi.mock("@/lib/users-store", () => ({
