@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { AdminSidebar, AdminSidebarMobile } from "@/components/admin/admin-sidebar";
 import { SiteHeader } from "@/components/site-header";
+import { DatabaseNotice } from "@/components/admin/database-notice";
 import { getAdminUser } from "@/lib/admin";
+import { getDatabaseStatus } from "@/lib/db";
 
 export const metadata = { title: "Admin — Rangkaarii" };
 
@@ -14,6 +16,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   // One guard for the whole subtree; the Server Actions re-check independently.
   const admin = await getAdminUser();
   if (!admin) notFound();
+  const databaseStatus = await getDatabaseStatus();
 
   return (
     <>
@@ -32,6 +35,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
                 you add here goes live on the site straight away.
               </p>
             </header>
+            <DatabaseNotice status={databaseStatus} />
             {children}
           </main>
         </div>

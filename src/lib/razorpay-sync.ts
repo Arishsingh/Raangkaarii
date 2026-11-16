@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logDbError } from "@/lib/db";
 import { markSettled, reconcileCapturedPayment } from "@/lib/orders-store";
 
 /**
@@ -150,7 +151,7 @@ export async function syncRazorpayPayments(): Promise<SyncResult> {
   } catch (caught) {
     // A sync failure must not take the admin panel down with it: the orders
     // already in the table are still worth showing.
-    console.error("Could not sync with Razorpay", caught);
+    logDbError("Could not sync with Razorpay", caught);
     return {
       ok: false,
       recovered,

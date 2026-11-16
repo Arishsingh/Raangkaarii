@@ -1,7 +1,6 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import NeonAdapter from "@auth/neon-adapter";
-import { Pool } from "@neondatabase/serverless";
+import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import bcrypt from "bcryptjs";
 
 import { authConfig } from "@/auth.config";
@@ -11,10 +10,11 @@ import {
   loginIsBlocked,
   recordLoginFailure,
 } from "@/lib/login-limit";
+import { getMongoClient, MONGODB_DB } from "@/lib/mongo";
 import { ensureAuthSchema, findUserByEmail } from "@/lib/users-store";
 
 /**
- * The full Auth.js instance: providers, the Neon adapter, and the password
+ * The full Auth.js instance: providers, the MongoDB adapter, and the password
  * check. `auth()` is how every server component, route handler and Server
  * Action asks who is signed in — nothing decodes the token by hand.
  */
@@ -40,14 +40,14 @@ export class TooManyAttempts extends CredentialsSignin {
 }
 
 /**
- * The adapter needs a Pool rather than the HTTP client the rest of the app
- * uses. It is built inside the config factory, which Auth.js calls per request,
- * because a WebSocket pool cannot be shared across serverless invocations —
- * and because `next build` evaluates module scope before DATABASE_URL exists.
+ * The adapter stores users and linked Google accounts in MongoDB Atlas. It is
+ * built inside the config factory, which Auth.js calls per request, so
+ * `next build` never evaluates MONGODB_URI at module scope. The client itself
+ * is a shared singleton (see lib/mongo.ts), not one connection per request.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   ...authConfig,
-  adapter: NeonAdapter(new Pool({ connectionString: process.env.DATABASE_URL })),
+  adapter: MongoDBAdapter(getMongoClient(), { databaseName: MONGODB_DB }),
   providers: [
     ...authConfig.providers,
     Credentials({
@@ -89,7 +89,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
           return null;
         }
 
-        await clearLoginFailures(email).catch((caught) =>
+        // Housekeeping: nothing downstream needs it done before the session.
+        void clearLoginFailures(email).catch((caught) =>
           console.error("Could not clear login failures", caught),
         );
 

@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
-import { getSql, isDatabaseConfigured, readWithFallback } from "@/lib/db";
+import { getSql, isDatabaseConfigured, readWithFallback, logDbError } from "@/lib/db";
 
 /** A product created through the admin panel. Superset of both catalogue shapes. */
 export type AdminProduct = {
@@ -195,7 +195,7 @@ export async function getAdminProduct(id: string): Promise<AdminProduct | null> 
     `) as Row[];
     return rows[0] ? toProduct(rows[0]) : null;
   } catch (error) {
-    console.error("Could not load admin product", error);
+    logDbError("Could not load admin product", error);
     return null;
   }
 }

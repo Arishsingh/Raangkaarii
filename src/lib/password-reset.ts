@@ -2,7 +2,9 @@ import "server-only";
 
 import crypto from "node:crypto";
 
-import { getSql } from "@/lib/db";
+import { ObjectId } from "mongodb";
+
+import { getMongoDb } from "@/lib/mongo";
 import { ensureAuthSchema, findUserByEmail } from "@/lib/users-store";
 
 /**
@@ -23,26 +25,24 @@ function ensureResetSchema() {
   if (!schemaReady) {
     schemaReady = (async () => {
       await ensureAuthSchema();
-      const sql = getSql();
-      await sql`
-        create table if not exists password_reset_tokens (
-          token_hash text primary key,
-          user_id    uuid not null references users (id) on delete cascade,
-          expires_at timestamptz not null,
-          used_at    timestamptz,
-          created_at timestamptz not null default now()
-        )
-      `;
-      await sql`
-        create index if not exists password_reset_tokens_user_idx
-          on password_reset_tokens (user_id, created_at)
-      `;
+      const db = await getMongoDb();
+      const tokens = db.collection("password_reset_tokens");
+      await Promise.all([
+        tokens.createIndex({ tokenHash: 1 }, { unique: true }),
+        tokens.createIndex({ userId: 1, createdAt: 1 }),
+        // Mongo deletes the row a day after it expires; nothing reads it then.
+        tokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 }),
+      ]);
     })().catch((error) => {
       schemaReady = null;
       throw error;
     });
   }
   return schemaReady;
+}
+
+async function tokensCollection() {
+  return (await getMongoDb()).collection("password_reset_tokens");
 }
 
 function hashToken(token: string) {
@@ -67,27 +67,25 @@ export async function createResetToken(email: string): Promise<ResetTokenResult>
     return { status: "no_account" };
   }
 
-  const sql = getSql();
-  const [recent] = (await sql`
-    select count(*)::int as n
-      from password_reset_tokens
-     where user_id = ${user.id}
-       and created_at > now() - interval '1 hour'
-  `) as { n: number }[];
-  if ((recent?.n ?? 0) >= MAX_REQUESTS_PER_HOUR) {
+  const tokens = await tokensCollection();
+  const recent = await tokens.countDocuments({
+    userId: user.id,
+    createdAt: { $gt: new Date(Date.now() - 60 * 60 * 1000) },
+  });
+  if (recent >= MAX_REQUESTS_PER_HOUR) {
     console.warn(`Password reset skipped: ${MAX_REQUESTS_PER_HOUR} links already sent this hour`);
     return { status: "rate_limited" };
   }
 
   const token = crypto.randomBytes(32).toString("base64url");
-  await sql`
-    insert into password_reset_tokens (token_hash, user_id, expires_at)
-    values (
-      ${hashToken(token)},
-      ${user.id},
-      now() + make_interval(mins => ${RESET_TOKEN_TTL_MINUTES})
-    )
-  `;
+  const now = Date.now();
+  await tokens.insertOne({
+    tokenHash: hashToken(token),
+    userId: user.id,
+    expiresAt: new Date(now + RESET_TOKEN_TTL_MINUTES * 60 * 1000),
+    usedAt: null,
+    createdAt: new Date(now),
+  });
   return { status: "issued", token, name: user.name, email: user.email };
 }
 
@@ -98,24 +96,19 @@ export async function createResetToken(email: string): Promise<ResetTokenResult>
 export async function discardResetToken(token: string) {
   if (!token) return;
   await ensureResetSchema();
-  const sql = getSql();
-  await sql`delete from password_reset_tokens where token_hash = ${hashToken(token)}`;
+  await (await tokensCollection()).deleteOne({ tokenHash: hashToken(token) });
 }
 
 /** Whether a token is still usable, without spending it — for the reset page. */
 export async function resetTokenIsValid(token: string) {
   if (!token) return false;
   await ensureResetSchema();
-  const sql = getSql();
-  const rows = (await sql`
-    select 1
-      from password_reset_tokens
-     where token_hash = ${hashToken(token)}
-       and used_at is null
-       and expires_at > now()
-     limit 1
-  `) as unknown[];
-  return rows.length > 0;
+  const found = await (await tokensCollection()).findOne({
+    tokenHash: hashToken(token),
+    usedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+  return Boolean(found);
 }
 
 /**
@@ -129,37 +122,33 @@ export async function resetPassword(
 ): Promise<string | null> {
   if (!token) return null;
   await ensureResetSchema();
-  const sql = getSql();
+  const tokens = await tokensCollection();
 
-  const rows = (await sql`
-    with spent as (
-      update password_reset_tokens
-         set used_at = now()
-       where token_hash = ${hashToken(token)}
-         and used_at is null
-         and expires_at > now()
-      returning user_id
-    ),
-    updated as (
-      update users
-         set password = ${passwordHash},
-             -- The reset link reached their inbox, so the address is proven.
-             "emailVerified" = coalesce("emailVerified", now()),
-             updated_at = now()
-       where id = (select user_id from spent)
-      returning id, email
-    )
-    select id, email from updated
-  `) as { id: string; email: string }[];
+  // One atomic update: two submissions of the same link cannot both match.
+  const spent = await tokens.findOneAndUpdate(
+    { tokenHash: hashToken(token), usedAt: null, expiresAt: { $gt: new Date() } },
+    { $set: { usedAt: new Date() } },
+  );
+  if (!spent) return null;
 
-  const userId = rows[0]?.id;
-  if (!userId) return null;
+  const db = await getMongoDb();
+  const userId = new ObjectId(String(spent.userId));
+  const user = await db.collection("users").findOneAndUpdate(
+    { _id: userId },
+    { $set: { password: passwordHash } },
+    { returnDocument: "after" },
+  );
+  if (!user) return null;
+
+  // The reset link reached their inbox, so the address is proven.
+  await db
+    .collection("users")
+    .updateOne({ _id: userId, emailVerified: null }, { $set: { emailVerified: new Date() } });
 
   // Any other link still sitting in their inbox stops working now.
-  await sql`
-    update password_reset_tokens
-       set used_at = now()
-     where user_id = ${userId} and used_at is null
-  `;
-  return rows[0].email;
+  await tokens.updateMany(
+    { userId: String(userId), usedAt: null },
+    { $set: { usedAt: new Date() } },
+  );
+  return String(user.email);
 }
