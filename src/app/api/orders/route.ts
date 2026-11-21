@@ -1,12 +1,16 @@
 import { auth } from "@/auth";
 
 import {
+  countPendingCod,
   markOrderPaid,
   saveOrder,
   type StoredAddress,
 } from "@/lib/orders-store";
 import { priceCart } from "@/lib/pricing";
 import { signatureValid } from "@/lib/razorpay";
+
+/** Unconfirmed cash-on-delivery orders one account may have open at once. */
+const MAX_PENDING_COD = 3;
 
 type Body = {
   id?: string;
@@ -92,7 +96,25 @@ export async function POST(request: Request) {
   }
 
   const id = String(body.id ?? "").trim();
-  if (!id) return Response.json({ error: "Missing order id." }, { status: 400 });
+  if (!/^OD[0-9A-Z]{10,20}$/.test(id)) {
+    return Response.json({ error: "Missing or invalid order id." }, { status: 400 });
+  }
+
+  // A courier cannot deliver without one, and COD is not prepaid.
+  const address = readAddress(body.address);
+  if (!address || address.phone.length < 10) {
+    return Response.json(
+      { error: "A full delivery address and phone number are needed for cash on delivery." },
+      { status: 400 },
+    );
+  }
+
+  if ((await countPendingCod(user.id)) >= MAX_PENDING_COD) {
+    return Response.json(
+      { error: "You have several cash-on-delivery orders awaiting confirmation. Please wait for them to be processed." },
+      { status: 429 },
+    );
+  }
 
   /**
    * Prices are recomputed from the catalogue, never read from the request —
@@ -102,7 +124,7 @@ export async function POST(request: Request) {
   if (!cart) return Response.json({ error }, { status: 400 });
 
   try {
-    await saveOrder({
+    const saved = await saveOrder({
       id,
       userId: user.id,
       email: user.email ?? "",
@@ -116,8 +138,11 @@ export async function POST(request: Request) {
       subtotal: cart.subtotal,
       delivery: cart.delivery,
       payable: cart.payable,
-      address: readAddress(body.address),
+      address,
     });
+    if (!saved) {
+      return Response.json({ error: "That order id is already in use." }, { status: 409 });
+    }
   } catch (caught) {
     console.error("Could not record order", caught);
     return Response.json({ error: "Could not record the order." }, { status: 500 });

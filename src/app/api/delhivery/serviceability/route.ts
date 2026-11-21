@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { checkPincode, isDelhiveryConfigured } from "@/lib/delhivery";
 
 /**
@@ -7,6 +8,9 @@ import { checkPincode, isDelhiveryConfigured } from "@/lib/delhivery";
  * coverage, and a shopper needs the answer before they have an account.
  */
 export async function GET(request: Request) {
+  const limited = await rateLimit(request, "pincode", 60, 600);
+  if (limited) return limited;
+
   if (!isDelhiveryConfigured()) {
     return Response.json({ error: "Delivery checks are not configured." }, { status: 503 });
   }

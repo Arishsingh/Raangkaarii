@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import Razorpay from "razorpay";
 import { auth } from "@/auth";
 
@@ -66,11 +68,7 @@ export async function POST(request: Request) {
 
   // Our own id, minted here so the browser cannot pick one that collides with
   // an order someone else already placed.
-  const receiptId = `OD${Date.now().toString().slice(-10)}${Math.floor(
-    Math.random() * 1000,
-  )
-    .toString()
-    .padStart(3, "0")}`;
+  const receiptId = `OD${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
 
   const email = user.email ?? "";
   const name = user.name ?? "";

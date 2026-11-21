@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
 
+import { rateLimit } from "@/lib/rate-limit";
+
 import { BCRYPT_ROUNDS } from "@/auth";
 import { EMAIL_PATTERN, PASSWORD_MIN_LENGTH } from "@/lib/auth-rules";
 import {
@@ -28,6 +30,9 @@ function bad(error: string, status = 400) {
 }
 
 export async function POST(request: Request) {
+  const limited = await rateLimit(request, "register", 10, 3600);
+  if (limited) return limited;
+
   let body: Body;
   try {
     body = await request.json();

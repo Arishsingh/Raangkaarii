@@ -65,6 +65,12 @@ function toAccountUser(doc: Document): AccountUser {
   };
 }
 
+/** Whether this address was proven (Google asserted it, or a reset link reached it). */
+export async function emailIsVerified(email: string): Promise<boolean> {
+  const user = await findUserByEmail(email);
+  return Boolean(user?.emailVerified);
+}
+
 export async function findUserByEmail(email: string): Promise<AccountUser | null> {
   await ensureAuthSchema();
   const db = await getMongoDb();

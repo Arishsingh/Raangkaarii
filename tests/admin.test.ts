@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: authMock }));
+const verifiedMock = vi.fn();
+vi.mock("@/lib/users-store", () => ({ emailIsVerified: verifiedMock }));
 
 describe("admin access", () => {
   beforeEach(() => {
@@ -49,8 +51,16 @@ describe("admin access", () => {
 
   it("getAdminUser returns the admin's session user", async () => {
     const { getAdminUser } = await import("@/lib/admin");
-    const user = { id: "u1", email: "admin@gmail.com" };
+    const user = { id: "u1", email: "arishsingh9469@gmail.com" };
+    verifiedMock.mockResolvedValueOnce(true);
     authMock.mockResolvedValueOnce({ user });
     expect(await getAdminUser()).toEqual(user);
+  });
+
+  it("getAdminUser refuses an admin address that was never verified", async () => {
+    const { getAdminUser } = await import("@/lib/admin");
+    verifiedMock.mockResolvedValueOnce(false);
+    authMock.mockResolvedValueOnce({ user: { id: "u1", email: "arishsingh9469@gmail.com" } });
+    expect(await getAdminUser()).toBeNull();
   });
 });

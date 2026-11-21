@@ -52,8 +52,8 @@ beforeAll(async () => {
     id: "u-arish", name: null, email: "arishsingh9469@gmail.com", image: null,
     password: hash, emailVerified: null,
   });
-  users.set("admin@gmail.com", {
-    id: "u-admin", name: "Admin", email: "admin@gmail.com", image: null,
+  users.set("arishsingh9469@gmail.com", {
+    id: "u-admin", name: "Admin", email: "arishsingh9469@gmail.com", image: null,
     password: hash, emailVerified: new Date(),
   });
 });
@@ -145,8 +145,8 @@ describe("real Auth.js sign-in flow", () => {
     expect(failures).not.toContain("asha@example.com");
   });
 
-  it("admin@gmail.com signs in with its password and is recognised as admin", async () => {
-    const result = await signInWith("admin@gmail.com", "correct-horse-battery");
+  it("arishsingh9469@gmail.com signs in with its password and is recognised as admin", async () => {
+    const result = await signInWith("arishsingh9469@gmail.com", "correct-horse-battery");
     expect(result.error).toBeNull();
     const session = await sessionFor(result.cookie);
     const { emailIsAdmin } = await import("@/lib/admin");
