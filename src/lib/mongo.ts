@@ -15,12 +15,12 @@ const globalForMongo = globalThis as unknown as {
 };
 
 export function isMongoConfigured() {
-  return Boolean(process.env.MONGODB_URI);
+  return Boolean(process.env.MONGODB_URI?.trim());
 }
 
 export function getMongoClient(): Promise<MongoClient> {
   if (!globalForMongo.__mongoClient) {
-    const uri = process.env.MONGODB_URI;
+    const uri = process.env.MONGODB_URI?.trim();
     if (!uri) throw new Error("MONGODB_URI is not set.");
     const client = new MongoClient(uri, {
       // Fail fast on a bad network instead of hanging a page for 30s.
@@ -36,7 +36,8 @@ export function getMongoClient(): Promise<MongoClient> {
   return globalForMongo.__mongoClient;
 }
 
-export const MONGODB_DB = process.env.MONGODB_DB || "raangkaari";
+// Trimmed: a stray space pasted into the host's settings becomes part of the name.
+export const MONGODB_DB = process.env.MONGODB_DB?.trim() || "raangkaari";
 
 export async function getMongoDb() {
   return (await getMongoClient()).db(MONGODB_DB);

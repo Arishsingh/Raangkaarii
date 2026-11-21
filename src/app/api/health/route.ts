@@ -22,15 +22,9 @@ export async function GET() {
   }
 
   const shop = await getDatabaseStatus(); // "ok" | "quota" | "down"
-  const secrets = {
-    AUTH_SECRET: Boolean(process.env.AUTH_SECRET),
-    AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST === "true",
-    MONGODB_DB: process.env.MONGODB_DB ?? "(default: raangkaari)",
-  };
-
   const healthy = accounts === "ok";
   return Response.json(
-    { accounts: { mongodb: accounts }, shop: { neon: shop }, secrets },
+    { accounts: { mongodb: accounts === "ok" ? "ok" : "down" }, shop: { neon: shop } },
     { status: healthy ? 200 : 503 },
   );
 }

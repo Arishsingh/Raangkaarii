@@ -1,3 +1,5 @@
+import { rateLimit } from "@/lib/rate-limit";
+
 const MODEL = "gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
@@ -15,6 +17,9 @@ Guidelines:
 type Turn = { role: "user" | "model"; text: string };
 
 export async function POST(request: Request) {
+  const limited = await rateLimit(request, "chat", 20, 600);
+  if (limited) return limited;
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return Response.json({ error: "Chat is not configured." }, { status: 500 });

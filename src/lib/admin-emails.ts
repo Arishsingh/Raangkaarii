@@ -4,7 +4,6 @@
  */
 /** Fallback owners, used when no ADMIN_EMAILS override is set. */
 const DEFAULT_ADMIN_EMAILS = [
-  "admin@gmail.com",
   "arishsingh9469@gmail.com",
   "mohitsalgotra@gmail.com",
   "23anuragsharma@gmail.com",

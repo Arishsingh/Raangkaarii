@@ -196,7 +196,7 @@ type NewOrder = Omit<
 export async function saveOrder(order: NewOrder) {
   await ensureOrdersSchema();
   const sql = getSql();
-  await sql`
+  const rows = (await sql`
     insert into orders (
       id, user_id, email, name, lines, payment, payment_id, razorpay_order_id,
       status, items, subtotal, delivery, payable, address
@@ -208,7 +208,21 @@ export async function saveOrder(order: NewOrder) {
       ${order.address ? JSON.stringify(order.address) : null}::jsonb
     )
     on conflict (id) do nothing
-  `;
+    returning id
+  `) as { id: string }[];
+  /** False when the id was already taken and nothing was written. */
+  return rows.length > 0;
+}
+
+/** Orders a shopper has placed that nobody has confirmed or paid for yet. */
+export async function countPendingCod(userId: string) {
+  await ensureOrdersSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    select count(*)::int as n from orders
+     where user_id = ${userId} and payment = 'Cash on Delivery' and status = 'pending'
+  `) as { n: number }[];
+  return rows[0]?.n ?? 0;
 }
 
 /**

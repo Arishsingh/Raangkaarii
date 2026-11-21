@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { emailConfigured, passwordResetEmail, sendEmail } from "@/lib/email";
 import { EMAIL_PATTERN } from "@/lib/auth-rules";
 import { createResetToken, discardResetToken, RESET_TOKEN_TTL_MINUTES } from "@/lib/password-reset";
@@ -17,6 +18,9 @@ import { normaliseEmail } from "@/lib/users-store";
 export type ForgotStatus = "sent" | "no_account" | "rate_limited";
 
 export async function POST(request: Request) {
+  const limited = await rateLimit(request, "forgot", 10, 3600);
+  if (limited) return limited;
+
   let email = "";
   try {
     const body = await request.json();
